@@ -1,0 +1,11 @@
+services:
+  hiorg-sync:
+    build: .
+    container_name: hiorg-sync
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    env_file:
+      - .env
+    volumes:
+      - /var/lib/hiorg-sync:/var/lib/hiorg-sync

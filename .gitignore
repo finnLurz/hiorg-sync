@@ -1,0 +1,20 @@
+# secrets
+.env
+
+# python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# venvs
+venv/
+.venv/
+
+# misc junk / transfer artifacts
+reading
+resolve
+transferring
+[internal]
+=
+sha256:*
