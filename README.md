@@ -1,6 +1,6 @@
 # hiorg-sync
 
-HiOrg ? Active Directory / LDAP Sync (OAuth + LDAP/AD) inkl. Web-UI f�r Group-Mapping (Standort/OV-basiert).
+HiOrg ? Active Directory / LDAP Sync (OAuth + LDAP/AD) inkl. Web-UI fÃƒÂ¼r Group-Mapping (Standort/OV-basiert).
 
 - **Ziel:** HiOrg-Benutzer/Attribute nach AD synchronisieren  
 - **Zusatz:** HiOrg-Gruppen auf AD-Gruppen abbilden (Mapping pro OV/Standort)
@@ -25,13 +25,13 @@ HiOrg ? Active Directory / LDAP Sync (OAuth + LDAP/AD) inkl. Web-UI f�r Group-Ma
 ## Features
 
 - ? AD/LDAP Sync (Create/Update je nach Logik)
-- ? Multi-OV Konzept (`ov=...`) mit getrennten Datenst�nden
+- ? Multi-OV Konzept (`ov=...`) mit getrennten DatenstÃƒÂ¤nden
 - ? Web-UI (Jinja2 + Static Assets):
   - Login
   - OV-Auswahl
   - Gruppen-Mapping (Locations/BaseDN + Gruppen/AD-CN)
-- ? CSS/JS frei anpassbar �ber `/static`
-- ? API-Endpunkte f�r Sync + UI-Backend
+- ? CSS/JS frei anpassbar ÃƒÂ¼ber `/static`
+- ? API-Endpunkte fÃƒÂ¼r Sync + UI-Backend
 
 ---
 
@@ -39,7 +39,7 @@ HiOrg ? Active Directory / LDAP Sync (OAuth + LDAP/AD) inkl. Web-UI f�r Group-Ma
 
 - **FastAPI App** (`create_app()`), Router:
   - `routers/ui.py` (HTML UI)
-  - `routers/api.py` (UI-API f�r Groupmap/Gruppenliste)
+  - `routers/api.py` (UI-API fÃƒÂ¼r Groupmap/Gruppenliste)
   - `routers/sync.py` (Sync-Endpunkte)
   - `routers/oauth.py` (OAuth, falls aktiv)
   - `routers/misc.py` (health etc.)
@@ -63,7 +63,7 @@ docker compose build --no-cache
 docker compose up -d
 
 
-## 3) UI �ffnen
+## 3) UI ÃƒÂ¶ffnen
 
 **Login:** `http://<host>:8088/ui/login`  
 **OV-Auswahl:** `http://<host>:8088/ui/ov`  
@@ -79,10 +79,10 @@ docker compose up -d
   Optional, aber empfohlen (API-Schutz).
 
 - `OV_LIST=obum,obub,obuo,obuw,obus`  
-  Liste der verf�gbaren OVs (wird im UI angeboten).
+  Liste der verfÃƒÂ¼gbaren OVs (wird im UI angeboten).
 
-Zus�tzlich (abh�ngig vom Setup): LDAP/AD Host, BindDN, Passwort, Search BaseDNs etc.  
-?? Siehe `.env.example` f�r alle Optionen.
+ZusÃƒÂ¤tzlich (abhÃƒÂ¤ngig vom Setup): LDAP/AD Host, BindDN, Passwort, Search BaseDNs etc.  
+?? Siehe `.env.example` fÃƒÂ¼r alle Optionen.
 
 ---
 

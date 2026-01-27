@@ -2,8 +2,14 @@ import secrets
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse
-from .. import legacy
-from ..core.settings import get_ov_list
+
+from ..core.settings import get_ov_list, require_ov
+from ..core.security import (
+    UI_PASSWORD,
+    UI_SESSION_TTL_HOURS,
+    ui_make_session,
+    require_ui_login,
+)
 
 router = APIRouter()
 
@@ -20,7 +26,7 @@ def ui_login_get(request: Request, next: str = "/ui/ov"):
         {
             "request": request,
             "next": next,
-            "ttl_hours": legacy.UI_SESSION_TTL_HOURS,
+            "ttl_hours": UI_SESSION_TTL_HOURS,
         },
     )
 
@@ -31,10 +37,10 @@ async def ui_login_post(request: Request):
     pw = str(form.get("password", "") or "")
     nxt = str(form.get("next", "") or "/ui/ov")
 
-    if legacy.UI_PASSWORD and not secrets.compare_digest(pw, legacy.UI_PASSWORD):
+    if UI_PASSWORD and not secrets.compare_digest(pw, UI_PASSWORD):
         raise HTTPException(401, "Invalid password")
 
-    token = legacy._ui_make_session()
+    token = ui_make_session()
     resp = RedirectResponse(url=nxt, status_code=302)
     resp.set_cookie(
         "ui_session",
@@ -42,7 +48,7 @@ async def ui_login_post(request: Request):
         httponly=True,
         secure=False,  # hinter HTTPS Proxy -> True
         samesite="lax",
-        max_age=legacy.UI_SESSION_TTL_HOURS * 3600,
+        max_age=UI_SESSION_TTL_HOURS * 3600,
     )
     return resp
 
@@ -50,7 +56,7 @@ async def ui_login_post(request: Request):
 @router.get("/ui/ov")
 def ui_ov_get(request: Request, next: str = "/ui/groupmap"):
     try:
-        legacy._require_ui_login(request)
+        require_ui_login(request)
     except HTTPException:
         return RedirectResponse("/ui/login?next=/ui/ov", status_code=302)
 
@@ -71,7 +77,7 @@ def ui_ov_get(request: Request, next: str = "/ui/groupmap"):
 @router.post("/ui/ov")
 async def ui_ov_post(request: Request):
     try:
-        legacy._require_ui_login(request)
+        require_ui_login(request)
     except HTTPException:
         return RedirectResponse("/ui/login?next=/ui/ov", status_code=302)
 
@@ -89,7 +95,7 @@ async def ui_ov_post(request: Request):
         httponly=True,
         secure=False,
         samesite="lax",
-        max_age=legacy.UI_SESSION_TTL_HOURS * 3600,
+        max_age=UI_SESSION_TTL_HOURS * 3600,
     )
     return resp
 
@@ -97,7 +103,7 @@ async def ui_ov_post(request: Request):
 @router.get("/ui/groupmap")
 def ui_groupmap(request: Request, ov: str | None = None):
     try:
-        legacy._require_ui_login(request)
+        require_ui_login(request)
     except HTTPException:
         return RedirectResponse("/ui/login?next=/ui/ov", status_code=302)
 
@@ -106,7 +112,7 @@ def ui_groupmap(request: Request, ov: str | None = None):
     if not ov:
         return RedirectResponse("/ui/ov", status_code=302)
 
-    legacy._require_ov(ov)
+    require_ov(ov)
 
     return _templates(request).TemplateResponse(
         "groupmap.html",
