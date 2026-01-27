@@ -1,5 +1,0 @@
-fastapi
-uvicorn
-requests
-ldap3
-python-multipart
