@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<h2>HiOrg-Sync Login</h2>
+
+<form method="post" action="/ui/login" class="card">
+  <input type="hidden" name="next" value="{{ next }}">
+
+  <label for="password">Passwort</label>
+  <input id="password" type="password" name="password" autofocus>
+
+  <button type="submit">Anmelden</button>
+
+  <div class="hint">Session läuft nach {{ ttl_hours }}h ab.</div>
+</form>
+{% endblock %}

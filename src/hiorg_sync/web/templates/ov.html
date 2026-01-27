@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}OV auswählen{% endblock %}
+
+{% block content %}
+<h1>OV auswählen</h1>
+
+<form method="post" action="/ui/ov" class="card">
+  <label for="ov">OV</label>
+  <select id="ov" name="ov">
+    {% for ov in ovs %}
+      <option value="{{ ov }}" {% if ov == current %}selected{% endif %}>{{ ov }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit">Weiter</button>
+  <div class="hint">Wird als Standard im Browser gespeichert.</div>
+</form>
+{% endblock %}

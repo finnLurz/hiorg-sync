@@ -1,2 +1,2 @@
-# Compatibility wrapper (so existing Docker/uvicorn commands keep working)
+# Compatibility wrapper (keeps existing Docker/uvicorn command working)
 from hiorg_sync.main import app  # noqa: F401

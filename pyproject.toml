@@ -14,6 +14,7 @@ dependencies = [
   "requests",
   "ldap3",
   "python-multipart",
+  "jinja2",
 ]
 
 [tool.setuptools]
@@ -21,3 +22,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+hiorg_sync = ["web/templates/*.html", "web/static/*"]
