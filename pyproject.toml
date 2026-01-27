@@ -24,4 +24,9 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-hiorg_sync = ["web/templates/*.html", "web/static/*"]
+hiorg_sync = [
+  "web/templates/*.html",
+  "web/static/*.css",
+  "web/static/*.js",
+  "web/static/img/*",
+]

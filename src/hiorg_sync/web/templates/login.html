@@ -1,17 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Login{% endblock %}
-
 {% block content %}
-<h2>HiOrg-Sync Login</h2>
+  <h1 class="fwTitle">HiOrg-Sync Login</h1>
 
-<form method="post" action="/ui/login" class="card">
-  <input type="hidden" name="next" value="{{ next }}">
+  <form method="post" action="/ui/login">
+    <input type="hidden" name="next" value="{{ next or '/ui/ov' }}">
 
-  <label for="password">Passwort</label>
-  <input id="password" type="password" name="password" autofocus>
+    <div style="margin: 12px 0 8px;">
+      <label class="fwHint">Passwort</label>
+    </div>
 
-  <button type="submit">Anmelden</button>
+    <input class="fwInput" type="password" name="password" autofocus placeholder="••••••••">
 
-  <div class="hint">Session läuft nach {{ ttl_hours }}h ab.</div>
-</form>
+    <div style="margin-top: 14px;">
+      <button class="fwBtn" type="submit">Anmelden</button>
+    </div>
+
+    <div class="fwHint" style="margin-top: 10px;">
+      Session läuft nach {{ ttl_hours or 12 }}h ab.
+    </div>
+  </form>
 {% endblock %}

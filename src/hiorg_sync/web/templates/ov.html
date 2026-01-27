@@ -1,18 +1,23 @@
 {% extends "base.html" %}
-{% block title %}OV auswählen{% endblock %}
-
 {% block content %}
-<h1>OV auswählen</h1>
+  <h1 class="fwTitle">OV auswählen</h1>
 
-<form method="post" action="/ui/ov" class="card">
-  <label for="ov">OV</label>
-  <select id="ov" name="ov">
-    {% for ov in ovs %}
-      <option value="{{ ov }}" {% if ov == current %}selected{% endif %}>{{ ov }}</option>
-    {% endfor %}
-  </select>
+  <form method="post" action="/ui/ov">
+    <input type="hidden" name="next" value="{{ next or '/ui/groupmap' }}">
 
-  <button type="submit">Weiter</button>
-  <div class="hint">Wird als Standard im Browser gespeichert.</div>
-</form>
+    <div style="margin: 12px 0 8px;">
+      <label class="fwHint">OV</label>
+    </div>
+
+    <select class="fwInput" name="ov">
+      {% for ov in ovs %}
+        <option value="{{ ov }}" {% if ov == current %}selected{% endif %}>{{ ov }}</option>
+      {% endfor %}
+    </select>
+
+    <div style="margin-top: 14px; display: flex; gap: 10px; align-items: center;">
+      <button class="fwBtn" type="submit">Weiter</button>
+      <span class="fwHint">Wird als Standard im Browser gespeichert.</span>
+    </div>
+  </form>
 {% endblock %}

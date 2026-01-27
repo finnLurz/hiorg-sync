@@ -3,14 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}HiOrg-Sync{% endblock %}</title>
+  <title>{{ title or "HiOrg-Sync" }}</title>
 
   <link rel="stylesheet" href="/static/styles.css">
+  <!-- optional: für schnelle Anpassungen ohne styles.css anzufassen -->
   <link rel="stylesheet" href="/static/custom.css">
 </head>
 <body>
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
+  <div class="fwWrap">
+    <div class="fwCard">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
 </body>
 </html>

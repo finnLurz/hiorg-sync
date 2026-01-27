@@ -1,37 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Gruppen-Mapping ({{ ov }}){% endblock %}
-
 {% block content %}
+
 <div class="topbar">
-  <h1>Gruppen-Mapping <span class="muted">({{ ov }})</span></h1>
-  <div class="actions">
-    <a class="btn" href="/ui/ov">OV wechseln</a>
-  </div>
+  <h1>Gruppen-Mapping ({{ ov }})</h1>
+  <a class="fwBtn2 btn-back" href="/ui/ov">← Zurück</a>
 </div>
 
-<div class="hint">
-  Ziel: HiOrg-Gruppen (nach Standort) einer <b>GroupBaseDN</b> zuordnen. Gruppen werden <b>nicht</b> automatisch angelegt.
+<div class="fwHint" style="margin-bottom: 14px;">
+  Ziel: HiOrg-Gruppen (nach Standort) einer <b>GroupBaseDN</b> zuordnen.
+  Gruppen werden <b>nicht</b> automatisch angelegt.
 </div>
 
-<div class="card">
-  <div class="actions">
-    <button class="btn" onclick="loadAll()">Laden</button>
-    <button class="btn primary" onclick="saveAll()">Speichern</button>
-  </div>
-
-  <h2>Standort → BaseDN</h2>
-  <div id="locs"></div>
-  <button class="btn" onclick="addLoc()">+ Standort</button>
-
-  <h2 style="margin-top: 22px;">Gruppen</h2>
-  <div class="row hdr">
-    <div>HiOrg Gruppe</div><div>Standort</div><div>BaseDN</div><div>AD Gruppen-CN (optional)</div>
-  </div>
-  <div id="groups"></div>
+<div class="actions">
+  <button class="fwBtn" type="button" onclick="loadAll()">Laden</button>
+  <button class="fwBtn2" type="button" onclick="saveAll()">Speichern</button>
 </div>
+
+<h3 style="margin: 18px 0 10px;">Standort → BaseDN</h3>
+<div id="locs"></div>
+<div style="margin-top: 10px;">
+  <button class="fwBtn2" type="button" onclick="addLoc()">+ Standort</button>
+</div>
+
+<h3 style="margin: 26px 0 10px;">Gruppen</h3>
+<div class="fwRow fwHdr">
+  <div>HiOrg Gruppe</div>
+  <div>Standort</div>
+  <div>BaseDN</div>
+  <div>AD Gruppen-CN (optional)</div>
+</div>
+<div id="groups"></div>
 
 <script>
-const OV = "{{ ov }}";
+  window.HIORG_OV = "{{ ov }}";
 </script>
 <script src="/static/groupmap.js"></script>
+
 {% endblock %}

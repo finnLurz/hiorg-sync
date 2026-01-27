@@ -1,93 +1,184 @@
 :root{
-  --bg:#0b1220;
-  --card:#111a2e;
-  --text:#e6eaf2;
-  --muted:#aab3c5;
-  --border:rgba(255,255,255,.10);
-  --btn:#182443;
-  --btn2:#22325a;
+  --fw-red:#c8102e;
+  --fw-red-dark:#a30d25;
+  --fw-focus: rgba(200,16,46,.18);
+
+  --fw-glass: rgba(16, 28, 44, 0.82);
+  --fw-line: rgba(255,255,255,.20);
+  --fw-text: rgba(255,255,255,.94);
+  --fw-text-dim: rgba(255,255,255,.72);
+
+  --fw-blue-ring: rgba(40,160,255,.95);
+  --fw-blue-ring-soft: rgba(40,160,255,.35);
 }
 
 *{ box-sizing:border-box; }
+html,body{ height:100%; }
 body{
   margin:0;
+  color:var(--fw-text);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  background:var(--bg);
-  color:var(--text);
+
+  /* Hintergrund wie bei Keycloak */
+  background: url("/static/img/background_fw.png") no-repeat center center fixed;
+  background-size: cover;
 }
 
-.container{
-  max-width:1100px;
-  margin: 28px auto;
-  padding: 0 16px;
+/* ===== Layout / Card ===== */
+.fwWrap{
+  min-height:100vh;
+  padding: clamp(14px, 3vw, 28px);
+  display:grid;
+  place-items: start center;
 }
 
-h1{ font-size:22px; margin:0 0 14px; }
-h2{ font-size:16px; margin:18px 0 10px; }
-
-.card{
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:12px;
-  padding:16px;
+.fwCard{
+  width: min(1200px, 96vw);
+  padding: clamp(14px, 3vw, 22px);
+  border-radius: 24px;
+  border: 1px solid var(--fw-line);
+  background: var(--fw-glass);
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  backdrop-filter: blur(10px);
+  position: relative;
+  isolation: isolate;
 }
 
-label{ display:block; margin:10px 0 6px; color:var(--muted); }
-input, select{
+/* Blaulicht-Rand */
+.fwCard::after{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  border-radius:24px;
+  pointer-events:none;
+  border:3px solid var(--fw-blue-ring);
+  box-shadow:
+    0 0 0 1px rgba(40,160,255,.2),
+    0 0 18px var(--fw-blue-ring-soft),
+    0 0 60px rgba(40,160,255,.22);
+  opacity:.18;
+}
+
+/* ===== Typo ===== */
+.fwTitle{
+  margin: 0 0 10px 0;
+  font-size: 26px;
+  font-weight: 900;
+}
+.fwHint{
+  color: var(--fw-text-dim);
+  font-size: 13px;
+}
+
+/* ===== Inputs / Select ===== */
+.fwInput{
   width:100%;
-  padding:10px;
-  border-radius:10px;
-  border:1px solid var(--border);
-  background:#0f1730;
-  color:var(--text);
+  height:46px;
+  padding: 10px 12px;
+  border-radius:14px;
+  border:1px solid var(--fw-line);
+  background: rgba(8, 14, 24, 0.55);
+  color:#fff;
+  outline:none;
+}
+.fwInput:focus{
+  border-color: var(--fw-red);
+  box-shadow: 0 0 0 4px var(--fw-focus);
 }
 
-button, .btn{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  border:1px solid var(--border);
-  background:var(--btn);
-  color:var(--text);
-  padding:10px 12px;
-  border-radius:10px;
+.fwRow input{
+  width: 100%;
+  min-width: 0;           /* ganz wichtig im Grid */
+  box-sizing: border-box;
+}
+
+/* ===== Buttons ===== */
+.fwBtn, .fwBtn2{
+  height:46px;
+  padding: 0 16px;
+  border-radius:999px;
+  border:1px solid transparent;
   cursor:pointer;
-  text-decoration:none;
+  font-weight:800;
 }
-button:hover, .btn:hover{ background:var(--btn2); }
 
-.primary{ background:#2b4cff; border-color:#2b4cff; }
-.primary:hover{ filter:brightness(1.05); }
+.fwBtn{
+  background: var(--fw-red);
+  border-color: var(--fw-red);
+  color:#fff;
+}
+.fwBtn:hover{
+  background: var(--fw-red-dark);
+  border-color: var(--fw-red-dark);
+  box-shadow: 0 12px 26px rgba(200,16,46,.28);
+  transform: translateY(-1px);
+}
 
-.hint{
-  margin: 10px 0 14px;
-  color:var(--muted);
-  font-size:13px;
+.fwBtn2{
+  background: rgba(8,14,24,.45);
+  border: 1px solid var(--fw-line);
+  color: var(--fw-text);
+}
+.fwBtn2:hover{
+  border-color: rgba(40,160,255,.55);
+  box-shadow: 0 0 0 4px rgba(40,160,255,.16);
 }
 
 .topbar{
   display:flex;
-  justify-content:space-between;
   align-items:center;
-  margin-bottom:12px;
+  justify-content: space-between;
+  gap:14px;
+  margin-bottom:14px;
 }
-.muted{ color:var(--muted); }
+
+/* wichtig: Titel darf schrumpfen, Button nicht */
+.topbar h1{
+  margin:0;
+  min-width: 0;
+}
+
+.btn-back{
+  margin-left: auto;     /* schiebt ihn nach ganz rechts */
+  flex: 0 0 auto;        /* nicht schrumpfen */
+  white-space: nowrap;   /* kein Zeilenumbruch */
+}
+
+
+/* Link als Button */
+a.fwBtn2{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+  line-height:1;
+}
 
 .actions{
   display:flex;
   gap:10px;
   flex-wrap:wrap;
+  margin-bottom: 16px;
 }
 
-.row{
+/* ===== Groupmap Grid ===== */
+.fwRow{
   display:grid;
-  grid-template-columns: 2fr 1fr 2fr 2fr;
-  gap:10px;
-  padding:8px 0;
-  border-bottom:1px solid var(--border);
+  grid-template-columns: minmax(260px, 2.2fr) minmax(140px, 1fr) minmax(280px, 2fr) minmax(240px, 1.8fr);
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  align-items: center;
 }
-.row.hdr{
-  font-weight:600;
-  border-bottom:2px solid var(--border);
-  padding-bottom:10px;
+.fwHdr{
+  font-weight:900;
+  border-bottom: 2px solid rgba(255,255,255,.22);
+  padding-bottom: 10px;
+}
+
+
+.fwPage{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 22px 22px 28px;
 }
