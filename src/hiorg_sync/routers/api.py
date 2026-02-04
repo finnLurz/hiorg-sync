@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import os
 import re
+import urllib.request
+import urllib.parse
+import urllib.error
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
+
+from starlette.concurrency import run_in_threadpool
 
 from ..core.security import require_api_or_ui
 from ..core.settings import require_ov
@@ -17,6 +22,8 @@ router = APIRouter()
 # --- Config / Filter ---
 HIORG_LOCATION_KEY = os.getenv("HIORG_LOCATION_KEY", "standort")
 HIORG_GROUP_SPLIT_RE = os.getenv("HIORG_GROUP_SPLIT_RE", r"\s*::\s*")
+
+SYNC_AD_URL = os.getenv("SYNC_AD_URL", "http://127.0.0.1:8088/sync/ad")
 
 EXCLUDE_ORGAKUERZEL = {
     x.strip().lower()
@@ -54,6 +61,20 @@ def hiorg_groups(person: dict) -> list[str]:
         return [str(x) for x in g]
     return []
 
+
+def _do_sync_call(url: str, api_key: str) -> tuple[int, str]:
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"X-API-Key": api_key},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            return resp.status, body
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        return e.code, body
 
 @router.get("/api/groups")
 def api_groups(request: Request, ov: str, days: int = 3650):
@@ -113,3 +134,39 @@ async def api_groupmap_post(request: Request, ov: str):
 
     save_groupmap(ov, m)
     return {"ok": True}
+    
+    
+@router.post("/api/sync/ad/run")
+async def run_sync_ad(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    ov: str,
+    full: int = 0,
+    dry_run: int = 0,
+):
+    require_api_or_ui(request)
+    require_ov(ov)
+
+    api_key = os.getenv("SYNC_API_KEY", "")
+    if not api_key or api_key == "BITTEAENDERN":
+        raise HTTPException(status_code=500, detail="SYNC_API_KEY not configured")
+
+    params = {"ov": ov}
+    if full:
+        params["full"] = "1"
+    if dry_run:
+        params["dry_run"] = "1"
+
+    base = SYNC_AD_URL.rstrip("?")
+    url = base + "?" + urllib.parse.urlencode(params)
+
+    async def _runner():
+        status, body = await run_in_threadpool(_do_sync_call, url, api_key)
+        # optional: loggen, damit du Ergebnis siehst
+        print(f"[sync/ad] ov={ov} full={full} dry={dry_run} -> {status}")
+        if status != 200:
+            print(body[:2000])
+
+    background_tasks.add_task(_runner)
+
+    return {"ok": True, "started": True, "ov": ov, "full": bool(full), "dry_run": bool(dry_run)}

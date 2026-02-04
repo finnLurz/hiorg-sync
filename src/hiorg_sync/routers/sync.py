@@ -7,48 +7,37 @@ import re
 import secrets
 import unicodedata
 from datetime import datetime, timezone, timedelta
+
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request, HTTPException
-from ldap3 import (
-    MODIFY_ADD,
-    MODIFY_DELETE,
-    MODIFY_REPLACE,
-    BASE,
-    SUBTREE,
-)
+from ldap3 import MODIFY_ADD, MODIFY_DELETE, MODIFY_REPLACE, BASE
 from ldap3.utils.dn import escape_rdn
-
+from ..services.notify import send_mail
 from ..core.security import require_api_key
 from ..core.settings import (
     # OV handling (aus .env)
     require_ov,
     get_ov_list,
-
     # storage/marker
     DATA_DIR,
     INITIAL_SYNC_DAYS,
-
     # HiOrg -> Filter
     EXCLUDE_ORGAKUERZEL,
     LDAP_ONLY_STATUS_ACTIVE,
-
     # LDAP mapping behavior
     LDAP_OVERWRITE_EMPTY,
     LDAP_DEFAULT_DOMAIN,
     LDAP_CREATE_ENABLED,
     LDAP_MOVE_IF_OU_CHANGED,
-
     # sam generation
     LDAP_SAM_MODE,
     LDAP_SAM_USERNAME_KEY,
     LDAP_UPDATE_SAM,
-
     # HiOrg ID mapping
     LDAP_HIORG_ID_ATTR,
     LDAP_HIORG_ID_PREFIX,
-
     # group sync config
     HIORG_LOCATION_KEY,
     HIORG_GROUP_SPLIT_RE,
@@ -94,6 +83,58 @@ def _get_marker(ov: str) -> str:
 
 def _set_marker(ov: str, marker: str) -> None:
     _marker_path(ov).write_text(marker.strip() + "\n", encoding="utf-8")
+
+
+# -----------------------------
+# Notify (queue + rate limit) per OV
+# -----------------------------
+def _notify_last_sent_path(ov: str) -> Path:
+    return _ov_dir(ov) / "notify_last_sent.txt"
+
+
+def _notify_queue_path(ov: str) -> Path:
+    return _ov_dir(ov) / "notify_queue.json"
+
+
+def _read_last_sent(ov: str) -> datetime | None:
+    p = _notify_last_sent_path(ov)
+    if not p.exists():
+        return None
+    s = p.read_text(encoding="utf-8").strip()
+    if not s:
+        return None
+    try:
+        if s.endswith("Z"):
+            s = s.replace("Z", "+00:00")
+        return datetime.fromisoformat(s).astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def _write_last_sent(ov: str, dt: datetime) -> None:
+    _notify_last_sent_path(ov).write_text(_iso(dt) + "\n", encoding="utf-8")
+
+
+def _load_queue(ov: str) -> list[dict]:
+    p = _notify_queue_path(ov)
+    if not p.exists():
+        return []
+    try:
+        return json.loads(p.read_text(encoding="utf-8") or "[]")
+    except Exception:
+        return []
+
+
+def _save_queue(ov: str, items: list[dict]) -> None:
+    _notify_queue_path(ov).write_text(json.dumps(items, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    v = str(os.getenv(name, "")).strip().lower()
+    if not v:
+        return default
+    return v in ("1", "true", "yes", "on")
+
 
 
 # -----------------------------
@@ -277,6 +318,67 @@ def _ldap_attr_set(changes: dict, attr: str, value: Any) -> None:
         changes[attr] = [(MODIFY_REPLACE, [v])]
 
 
+def _ldap_val_to_list(v: Any) -> list[str]:
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return [str(x) for x in v if str(x).strip()]
+    s = str(v).strip()
+    return [s] if s else []
+
+
+def _get_existing_attr(existing: dict | None, attr: str) -> list[str]:
+    if not existing:
+        return []
+    a = (existing.get("attributes") or {})
+    return _ldap_val_to_list(a.get(attr))
+
+
+def _get_mapped_attr(mapped: dict, attr: str) -> list[str]:
+    return _ldap_val_to_list(mapped.get(attr))
+
+
+WATCH_PHONE = [
+    "telephoneNumber", "homePhone", "mobile", "ipPhone",
+    "otherTelephone", "otherHomePhone", "otherMobile",
+    "pager", "facsimileTelephoneNumber",
+]
+WATCH_ADDR = ["streetAddress", "postalCode", "l", "co"]
+WATCH_MAIL = ["mail", "proxyAddresses", "otherMailbox", "targetAddress"]
+WATCH_ALL = WATCH_PHONE + WATCH_ADDR + WATCH_MAIL
+
+
+def _diff_watched(existing: dict | None, mapped: dict[str, Any]) -> dict[str, dict]:
+    """
+    returns: {attr: {old: <...>, new: <...>}}
+    - For list attrs: compare sets (case-insensitive)
+    - For single attrs: compare first element string
+    Only diffs fields that are present in mapped.
+    """
+    changes: dict[str, dict] = {}
+
+    for attr in WATCH_ALL:
+        if attr not in mapped:
+            continue
+
+        old_list = _get_existing_attr(existing, attr)
+        new_list = _get_mapped_attr(mapped, attr)
+
+        if attr in ("proxyAddresses", "otherTelephone", "otherHomePhone", "otherMobile"):
+            old_set = {x.strip().lower() for x in old_list}
+            new_set = {x.strip().lower() for x in new_list}
+            if old_set != new_set:
+                changes[attr] = {"old": old_list, "new": new_list}
+            continue
+
+        old = (old_list[0].strip() if old_list else "")
+        new = (new_list[0].strip() if new_list else "")
+        if old != new:
+            changes[attr] = {"old": old, "new": new}
+
+    return changes
+
+
 def _find_existing_by_hiorg_id(conn, search_base: str, hiorg_id: str) -> dict | None:
     if not hiorg_id:
         return None
@@ -284,7 +386,22 @@ def _find_existing_by_hiorg_id(conn, search_base: str, hiorg_id: str) -> dict | 
         conn,
         search_base,
         f"({LDAP_HIORG_ID_ATTR}={hiorg_id})",
-        ["distinguishedName", "sAMAccountName", LDAP_HIORG_ID_ATTR],
+        [
+            "distinguishedName", "sAMAccountName", LDAP_HIORG_ID_ATTR,
+
+            # Phones
+            "telephoneNumber", "homePhone", "mobile", "ipPhone",
+            "otherTelephone", "otherHomePhone", "otherMobile",
+            "pager", "facsimileTelephoneNumber",
+
+            # Address
+            "streetAddress", "postalCode", "l", "co",
+
+            # Email
+            "mail", "proxyAddresses", "otherMailbox", "targetAddress",
+
+            "displayName",
+        ],
     )
 
 
@@ -348,6 +465,7 @@ def _sync_user_groups(conn, ov: str, user_dn: str, person: dict) -> dict:
 
     add_ok, add_skipped, remove_ok = [], [], []
 
+    # add desired
     for g in sorted(desired):
         group_dn, reason = _resolve_ad_group_dn(ov, g)
         if not group_dn:
@@ -357,19 +475,20 @@ def _sync_user_groups(conn, ov: str, user_dn: str, person: dict) -> dict:
             add_skipped.append({"group": g, "reason": "ad_group_missing", "dn": group_dn})
             continue
 
-        ok = conn.modify(group_dn, {LDAP_GROUP_MEMBER_ATTR: [(MODIFY_ADD, [user_dn])]} )
+        ok = conn.modify(group_dn, {LDAP_GROUP_MEMBER_ATTR: [(MODIFY_ADD, [user_dn])]})
         code = (conn.result or {}).get("result")
         if ok or code in (0, 20):
             add_ok.append({"group": g, "dn": group_dn})
         else:
             add_skipped.append({"group": g, "reason": f"ldap_error_{code}", "dn": group_dn, "detail": conn.result})
 
+    # remove managed-but-not-desired (optional)
     if LDAP_GROUP_SYNC_REMOVE:
         for g in sorted(managed_groups - desired):
             group_dn, reason = _resolve_ad_group_dn(ov, g)
             if not group_dn or not _group_exists(conn, group_dn):
                 continue
-            ok = conn.modify(group_dn, {LDAP_GROUP_MEMBER_ATTR: [(MODIFY_DELETE, [user_dn])]} )
+            ok = conn.modify(group_dn, {LDAP_GROUP_MEMBER_ATTR: [(MODIFY_DELETE, [user_dn])]})
             if ok:
                 remove_ok.append({"group": g, "dn": group_dn})
 
@@ -471,7 +590,7 @@ def debug_admap(request: Request, ov: str, limit: int = 3, dry_run: int = 1):
 
 
 @router.get("/sync/ad")
-def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0):
+def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: int = 0):
     require_api_key(request)
     require_ov(ov)
 
@@ -485,11 +604,28 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0):
     if not access:
         raise HTTPException(500, f"No access_token after refresh for ov '{ov}'")
 
-    marker = _get_marker(ov)
-    people = fetch_personal_updated_since(access, marker)
+    # Full Sync: Marker bewusst "ganz alt" setzen (ignoriert gespeicherten Marker)
+    if full:
+        marker = "1970-01-01T00:00:00Z"
+    else:
+        marker = _get_marker(ov)
 
+    people = fetch_personal_updated_since(access, marker)
     if limit and limit > 0:
         people = people[:limit]
+
+    # Notify config aus groupmap.json
+    gm = load_groupmap(ov)
+    notify_cfg = gm.get("notify") or {}
+    notify_enabled = bool(notify_cfg.get("enabled"))
+    notify_to = str(notify_cfg.get("to") or "").strip()
+    notify_subject_tpl = str(notify_cfg.get("subject") or "").strip()
+    try:
+        freq_hours = int(notify_cfg.get("freq_hours") or 0)
+    except Exception:
+        freq_hours = 0
+
+    notifications: list[dict] = []
 
     conn = ldap_conn()
     results = []
@@ -554,6 +690,8 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0):
         dn_existing = existing["dn"]
         dn_after = _move_if_needed(conn, dn_existing, target_ou)
 
+        watched_changes = _diff_watched(existing, mapped)
+
         changes: dict[str, Any] = {}
         _ldap_attr_set(changes, "givenName", mapped.get("givenName"))
         _ldap_attr_set(changes, "sn", mapped.get("sn"))
@@ -574,6 +712,21 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0):
         if changes:
             ok = conn.modify(dn_after, changes)
 
+        if ok and watched_changes:
+            old_display = ""
+            try:
+                old_display = (_get_existing_attr(existing, "displayName") or [""])[0]
+            except Exception:
+                old_display = ""
+
+            notifications.append({
+                "person_id": p.get("id"),
+                "sam": sam,
+                "display": str(mapped.get("displayName") or old_display or ""),
+                "dn": dn_after,
+                "changes": watched_changes,
+            })
+
         group_sync = _sync_user_groups(conn, ov, dn_after, p) if ok else {}
         results.append({
             "person_id": p.get("id"),
@@ -582,6 +735,7 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0):
             "dn": dn_after,
             "sam": sam,
             "changed_attrs": sorted(changes.keys()),
+            "watched_changed_attrs": sorted(watched_changes.keys()),
             "group_sync": group_sync,
             "result": conn.result,
         })
@@ -589,15 +743,101 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0):
     conn.unbind()
 
     new_marker = _iso(_now_utc() - timedelta(seconds=120))
-    _set_marker(ov, new_marker)
+
+    # Dry-run darf den Marker NICHT verändern
+    marker_written = False
+    if not dry_run:
+        _set_marker(ov, new_marker)
+        marker_written = True
+
+    # -----------------------------
+    # Notify: queue + rate-limit send (nur wenn nicht dry_run)
+    # - lädt immer Queue
+    # - hängt neue Einträge an (falls vorhanden)
+    # - sendet auch dann, wenn heute keine neuen Änderungen da sind,
+    #   aber Queue noch Einträge enthält und should_send=True
+    # -----------------------------
+    notify_sent = False
+    notify_queued = 0
+    notify_error = ""
+
+    if (not dry_run) and notify_enabled and notify_to:
+        q = _load_queue(ov)
+
+        # neue Benachrichtigungen anhängen (falls vorhanden)
+        if notifications:
+            ts = _iso(_now_utc())
+            for n in notifications:
+                n["ts"] = ts
+                q.append(n)
+
+            # Queue begrenzen
+            if len(q) > 2000:
+                q = q[-2000:]
+
+            _save_queue(ov, q)
+
+        notify_queued = len(q)
+
+        # Rate limit prüfen
+        should_send = False
+        if freq_hours <= 0:
+            should_send = True
+        else:
+            last = _read_last_sent(ov)
+            if (last is None) or ((_now_utc() - last).total_seconds() >= freq_hours * 3600):
+                should_send = True
+
+        # Senden, auch wenn nur alte Queue-Einträge da sind
+        if should_send and q:
+            subject = notify_subject_tpl or "[HiOrg-Sync] Änderungen OV={ov} ({count})"
+            subject = subject.replace("{ov}", ov).replace("{count}", str(len(q)))
+
+            lines: list[str] = []
+            lines.append(f"HiOrg-Sync Änderungsbericht OV={ov}")
+            lines.append(f"Einträge: {len(q)}")
+            lines.append("")
+
+            for item in q[:500]:
+                lines.append(
+                    f"- {item.get('display','?')} "
+                    f"(sam={item.get('sam','?')}, id={item.get('person_id','?')}, ts={item.get('ts','')})"
+                )
+                ch = item.get("changes") or {}
+                for attr, diff in ch.items():
+                    lines.append(f"    {attr}: {diff.get('old')} -> {diff.get('new')}")
+                lines.append("")
+
+            try:
+                send_mail(notify_to, subject, "\n".join(lines))
+                _save_queue(ov, [])
+                _write_last_sent(ov, _now_utc())
+                notify_sent = True
+                notify_queued = 0
+            except Exception as e:
+                notify_error = str(e)
+
+
+
 
     return {
         "ov": ov,
         "target_ou": target_ou,
         "updated_since_used": marker,
         "new_marker": new_marker,
+        "full": bool(full),
+        "dry_run": bool(dry_run),
+        "marker_written": marker_written,
         "count_incoming": incoming,
         "results": results,
+        "notify": {
+            "enabled": bool(notify_enabled),
+            "to": notify_to,
+            "freq_hours": freq_hours,
+            "queued_after_run": notify_queued,
+            "sent": notify_sent,
+            "error": notify_error,
+        },
         "notes": {
             "overwrite_empty": LDAP_OVERWRITE_EMPTY,
             "only_status_active": LDAP_ONLY_STATUS_ACTIVE,
