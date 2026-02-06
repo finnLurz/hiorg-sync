@@ -9,7 +9,7 @@ import secrets
 from fastapi import Request, HTTPException
 
 
-UI_PASSWORD = os.getenv("UI_PASSWORD", "")  # wenn leer: UI ungeschützt
+UI_PASSWORD = os.getenv("UI_PASSWORD", "")  # wenn leer: UI ungeschÃ¼tzt
 UI_SESSION_SECRET = os.getenv("UI_SESSION_SECRET", os.getenv("STATE_SECRET", "change-me"))
 UI_SESSION_TTL_HOURS = int(os.getenv("UI_SESSION_TTL_HOURS", "12"))
 

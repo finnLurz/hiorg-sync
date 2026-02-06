@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1 class="fwTitle">E-Mail / SMTP</h1>
+
+  <div class="fwHint" style="margin-top: 6px;">
+    Wird gespeichert unter <code>DATA_DIR/settings/email.json</code>. Passwort wird nicht angezeigt.
+  </div>
+
+  {% if saved %}
+    <div class="fwHint" style="margin-top: 10px;"><b>Gespeichert.</b></div>
+  {% endif %}
+
+  {% if tested %}
+    {% if test_ok %}
+      <div class="fwHint" style="margin-top: 10px;"><b>Testmail gesendet ?</b></div>
+    {% else %}
+      <div class="fwHint" style="margin-top: 10px;"><b style="color:#b00020;">Testmail fehlgeschlagen: {{ test_error }}</b></div>
+    {% endif %}
+  {% endif %}
+
+  <form method="post" action="/ui/settings/email" style="margin-top: 14px;">
+    <div style="display: grid; grid-template-columns: 160px 1fr; gap: 10px; align-items: center;">
+      <div class="fwHint">SMTP Host</div>
+      <input class="fwInput" name="SMTP_HOST" value="{{ cfg.get('SMTP_HOST','') }}" placeholder="mx.example.net">
+
+      <div class="fwHint">SMTP Port</div>
+      <input class="fwInput" name="SMTP_PORT" value="{{ cfg.get('SMTP_PORT','587') }}" placeholder="587">
+
+      <div class="fwHint">SMTP User</div>
+      <input class="fwInput" name="SMTP_USER" value="{{ cfg.get('SMTP_USER','') }}" placeholder="user@example.net">
+
+      <div class="fwHint">SMTP Pass</div>
+      <input class="fwInput" type="password" name="SMTP_PASS" value="" placeholder="(leer lassen = unverändert)">
+
+      <div class="fwHint">StartTLS</div>
+      <select class="fwInput" name="SMTP_STARTTLS">
+        <option value="true" {% if cfg.get('SMTP_STARTTLS', True) %}selected{% endif %}>true</option>
+        <option value="false" {% if not cfg.get('SMTP_STARTTLS', True) %}selected{% endif %}>false</option>
+      </select>
+
+      <div class="fwHint">SSL</div>
+      <select class="fwInput" name="SMTP_SSL">
+        <option value="true" {% if cfg.get('SMTP_SSL', False) %}selected{% endif %}>true</option>
+        <option value="false" {% if not cfg.get('SMTP_SSL', False) %}selected{% endif %}>false</option>
+      </select>
+
+      <div class="fwHint">Absender (NOTIFY_FROM)</div>
+      <input class="fwInput" name="NOTIFY_FROM" value="{{ cfg.get('NOTIFY_FROM','') }}" placeholder="hiorg-sync@example.net">
+
+      <div class="fwHint">Test an</div>
+      <input class="fwInput" name="TEST_TO" value="" placeholder="empfaenger@example.net">
+    </div>
+
+    <div style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+      <button class="fwBtn" type="submit" name="action" value="save">Speichern</button>
+      <button class="fwBtn" type="submit" name="action" value="test">Speichern + Testmail</button>
+      <a class="fwBtn" href="/ui/" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Zurück</a>
+    </div>
+  </form>
+{% endblock %}

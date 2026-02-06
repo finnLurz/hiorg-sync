@@ -119,7 +119,7 @@ def api_groups(request: Request, ov: str, days: int = 3650):
 def api_groupmap_get(request: Request, ov: str):
     require_api_or_ui(request)
     require_ov(ov)
-    return {"ov": ov, "map": load_groupmap(ov)}
+    return {"ov": ov, "map": load_groupmap()}
 
 
 @router.post("/api/groupmap")
@@ -132,7 +132,7 @@ async def api_groupmap_post(request: Request, ov: str):
     if not isinstance(m, dict):
         raise HTTPException(400, "body.map must be a dict")
 
-    save_groupmap(ov, m)
+    save_groupmap(m)
     return {"ok": True}
     
     

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1 class="fwTitle">HiOrg-Sync</h1>
+
+  {% if current_ov %}
+    <div class="fwHint" style="margin-top: 6px;">
+      Aktive OV im Browser: <b>{{ current_ov }}</b>
+    </div>
+  {% else %}
+    <div class="fwHint" style="margin-top: 6px;">
+      Keine OV gewählt (für Gruppenmapping nötig).
+    </div>
+  {% endif %}
+
+  <div style="margin-top: 16px; display: grid; grid-template-columns: 1fr; gap: 10px;">
+    <a class="fwBtn" href="/ui/ov">OV auswählen</a>
+
+    <a class="fwBtn" href="/ui/groupmap">Gruppenmapping</a>
+
+    <a class="fwBtn" href="/ui/settings/ou-map">LDAP OU-Mapping (OV ? User-OU)</a>
+
+    <a class="fwBtn" href="/ui/settings/email">E-Mail / Benachrichtigungen (SMTP)</a>
+
+    <a class="fwBtn" href="/ui/settings/ldap">LDAP BaseDN (zentral)</a>
+  </div>
+
+  <div class="fwHint" style="margin-top: 14px;">
+    Tipp: OU-Mapping & SMTP sind global. Gruppenmapping ist pro OV.
+  </div>
+{% endblock %}

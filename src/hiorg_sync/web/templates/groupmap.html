@@ -7,7 +7,9 @@
 </div>
 
 <div class="fwHint" style="margin-bottom: 14px;">
-  Ziel: HiOrg-Gruppen (nach Standort) einer <b>GroupBaseDN</b> zuordnen.
+  Ziel: HiOrg-Gruppen (optional nach Standort) einer AD-Gruppe (<b>CN</b>) zuordnen.
+  <br>
+  <b>BaseDN</b> wird zentral gepflegt unter <a href="/ui/settings/ldap">LDAP / BaseDN</a>.
   Gruppen werden <b>nicht</b> automatisch angelegt.
 </div>
 
@@ -54,8 +56,11 @@
   Platzhalter im Betreff: <code>{ov}</code> und <code>{count}</code>
 </div>
 
-<h3 style="margin: 18px 0 10px;">Standort → BaseDN</h3>
-<div id="locs"></div>
+<h3 style="margin: 26px 0 10px;">Standorte (optional)</h3>
+<div class="fwHint" style="margin-bottom: 10px;">
+  Standorte dienen nur zur besseren Struktur. BaseDN kommt zentral aus <a href="/ui/settings/ldap">LDAP / BaseDN</a>.
+</div>
+<div id="locsc"></div>
 <div style="margin-top: 10px;">
   <button class="fwBtn2" type="button" onclick="addLoc()">+ Standort</button>
 </div>
@@ -64,12 +69,9 @@
 <div class="fwRow fwHdr">
   <div>HiOrg Gruppe</div>
   <div>Standort</div>
-  <div>BaseDN (aus Standort)</div>
   <div>AD Gruppen-CN (Pflicht)</div>
 </div>
 <div id="groups"></div>
-
-
 
 <script>
   window.HIORG_OV = "{{ ov }}";
