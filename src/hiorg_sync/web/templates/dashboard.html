@@ -8,19 +8,85 @@
       {% if current_ov %}
         Aktive OV: <span class="ovBadge">{{ current_ov }}</span>
       {% else %}
-        <span style="color: #f59e0b;">Keine OV ausgewählt — für Gruppenmapping erforderlich.</span>
+        <span style="color: #d97706;">Keine OV ausgewählt &mdash; für Gruppen-Mapping erforderlich.</span>
       {% endif %}
     </div>
   </div>
 </div>
 
+<!-- ===== Statusanzeige ===== -->
+<div class="statusPanel">
+  <div class="statusRow">
+    <div class="statusItem">
+      <span class="statusDot {% if ldap_configured %}ok{% else %}warn{% endif %}"></span>
+      <span class="statusLabel">LDAP</span>
+      <span class="statusVal">{% if ldap_configured %}Konfiguriert{% else %}Nicht konfiguriert{% endif %}</span>
+    </div>
+    <div class="statusItem">
+      <span class="statusDot {% if ovs %}ok{% else %}warn{% endif %}"></span>
+      <span class="statusLabel">OVs</span>
+      <span class="statusVal">{{ ovs | length }} konfiguriert</span>
+    </div>
+    {% if current_ov and ov_status.get(current_ov) %}
+      {% set s = ov_status[current_ov] %}
+      <div class="statusItem">
+        <span class="statusDot {% if s.has_token %}ok{% else %}err{% endif %}"></span>
+        <span class="statusLabel">OAuth ({{ current_ov }})</span>
+        <span class="statusVal">{% if s.has_token %}Token vorhanden{% else %}Kein Token &mdash; OAuth starten{% endif %}</span>
+      </div>
+      <div class="statusItem">
+        <span class="statusDot {% if s.last_sync %}ok{% else %}warn{% endif %}"></span>
+        <span class="statusLabel">Letzter Sync</span>
+        <span class="statusVal">{% if s.last_sync %}{{ s.last_sync[:19] | replace("T", " ") }} UTC{% else %}Noch kein Sync{% endif %}</span>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if ov_status %}
+  <details class="statusDetails">
+    <summary>Alle OV-Status anzeigen</summary>
+    <div class="statusOvTable">
+      <div class="statusOvHdr">
+        <span>OV</span><span>Token</span><span>Letzter Sync</span>
+      </div>
+      {% for ov in ovs %}
+        {% set s = ov_status.get(ov, {}) %}
+        <div class="statusOvRow">
+          <span class="statusOvName">{{ ov }}</span>
+          <span>
+            {% if s.has_token %}
+              <span class="statusPill ok">OK</span>
+            {% else %}
+              <span class="statusPill err">Fehlt</span>
+            {% endif %}
+          </span>
+          <span class="statusOvSync">
+            {% if s.last_sync %}{{ s.last_sync[:19] | replace("T", " ") }}{% else %}&mdash;{% endif %}
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+</div>
+
+<!-- ===== Navigation Cards ===== -->
 <div class="dashGrid">
 
-  <a class="dashCard" href="/ui/settings/ovs">
-    <div class="dashIcon">🏢</div>
+  <a class="dashCard" href="/ui/groupmap">
+    <div class="dashIcon">🔗</div>
     <div class="dashText">
-      <div class="dashTitle">OV-Liste</div>
-      <div class="dashSub">Verfügbare OVs konfigurieren</div>
+      <div class="dashTitle">Gruppen-Mapping</div>
+      <div class="dashSub">HiOrg-Gruppen ↔ AD-Gruppen zuordnen &amp; Sync starten</div>
+    </div>
+    <div class="dashGo">›</div>
+  </a>
+
+  <a class="dashCard" href="/ui/ov">
+    <div class="dashIcon">🏷️</div>
+    <div class="dashText">
+      <div class="dashTitle">OV auswählen</div>
+      <div class="dashSub">Aktive OV wechseln (wird für Gruppen-Mapping benötigt)</div>
     </div>
     <div class="dashGo">›</div>
   </a>
@@ -34,11 +100,11 @@
     <div class="dashGo">›</div>
   </a>
 
-  <a class="dashCard" href="/ui/ov">
-    <div class="dashIcon">🏷️</div>
+  <a class="dashCard" href="/ui/settings/ovs">
+    <div class="dashIcon">🏢</div>
     <div class="dashText">
-      <div class="dashTitle">OV auswählen</div>
-      <div class="dashSub">Aktive OV im Browser setzen</div>
+      <div class="dashTitle">OV-Liste</div>
+      <div class="dashSub">Verfügbare OVs konfigurieren</div>
     </div>
     <div class="dashGo">›</div>
   </a>
@@ -52,15 +118,6 @@
     <div class="dashGo">›</div>
   </a>
 
-  <a class="dashCard" href="/ui/settings/email">
-    <div class="dashIcon">✉️</div>
-    <div class="dashText">
-      <div class="dashTitle">E-Mail & Benachrichtigungen</div>
-      <div class="dashSub">SMTP-Server und Absender konfigurieren</div>
-    </div>
-    <div class="dashGo">›</div>
-  </a>
-
   <a class="dashCard" href="/ui/settings/ldap">
     <div class="dashIcon">🧩</div>
     <div class="dashText">
@@ -70,10 +127,91 @@
     <div class="dashGo">›</div>
   </a>
 
+  <a class="dashCard" href="/ui/settings/email">
+    <div class="dashIcon">✉️</div>
+    <div class="dashText">
+      <div class="dashTitle">E-Mail &amp; Benachrichtigungen</div>
+      <div class="dashSub">SMTP-Server und Absender konfigurieren</div>
+    </div>
+    <div class="dashGo">›</div>
+  </a>
+
 </div>
 
 <div class="dashFoot fwHint">
-  OU-Mapping und SMTP sind global &nbsp;·&nbsp; Gruppenmapping ist pro OV
+  OU-Mapping und SMTP sind global &nbsp;&middot;&nbsp; Gruppen-Mapping ist pro OV
 </div>
+
+<style>
+.statusPanel {
+  background: rgba(255,255,255,0.45);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.55);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.06);
+}
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  align-items: center;
+}
+.statusItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+.statusDot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.statusDot.ok   { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.6); }
+.statusDot.warn { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,0.6); }
+.statusDot.err  { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.6); }
+.statusLabel { font-weight: 600; color: #1a1d2e; }
+.statusVal   { color: #6b7280; }
+.statusDetails {
+  margin-top: 12px;
+  font-size: 12px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  padding-top: 10px;
+}
+.statusDetails summary {
+  cursor: pointer;
+  color: #6366f1;
+  font-weight: 600;
+  padding: 2px 0;
+  user-select: none;
+  list-style: none;
+}
+.statusDetails summary::before { content: "↓ "; }
+.statusDetails[open] summary::before { content: "↑ "; }
+.statusOvTable { margin-top: 8px; display: grid; gap: 2px; }
+.statusOvHdr, .statusOvRow {
+  display: grid;
+  grid-template-columns: 90px 60px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.statusOvHdr {
+  font-weight: 700; color: #9ca3af;
+  text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px;
+}
+.statusOvRow:hover { background: rgba(255,255,255,0.4); }
+.statusOvName { font-weight: 600; color: #1a1d2e; }
+.statusOvSync { color: #6b7280; font-family: monospace; font-size: 11px; }
+.statusPill {
+  display: inline-block; padding: 1px 8px;
+  border-radius: 999px; font-weight: 600; font-size: 11px;
+}
+.statusPill.ok  { background: rgba(16,185,129,0.12); color: #065f46; border: 1px solid rgba(16,185,129,0.25); }
+.statusPill.err { background: rgba(239,68,68,0.10);  color: #991b1b; border: 1px solid rgba(239,68,68,0.22); }
+</style>
 
 {% endblock %}
