@@ -63,7 +63,10 @@ html, body { height: 100%; margin: 0; }
 
 /* ===== Base ===== */
 body {
-  background: var(--hs-bg);
+  background-color: var(--hs-bg);
+  /* Subtle dot grid pattern */
+  background-image: radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px);
+  background-size: 24px 24px;
   color: var(--hs-text);
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   font-size: 14px;
