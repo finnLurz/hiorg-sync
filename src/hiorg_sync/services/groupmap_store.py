@@ -14,59 +14,15 @@ GROUPMAP_PATH = SETTINGS_DIR / "groupmap.json"
 
 
 # -----------------------------
-# Central config (config.json)
-# schema:
-# {
-#   "base_dn_by_location": {
-#     "bommersheim": "OU=Gruppen,OU=Bommersheim,OU=Standorte,DC=fw-obu,DC=de",
-#     "mitte": "OU=Gruppen,OU=Mitte,OU=Standorte,DC=fw-obu,DC=de"
-#   }
-# }
+# OV map (per OV slice)
 # -----------------------------
-def load_global_config() -> dict[str, Any]:
-    cfg = read_json(CONFIG_PATH, default={})
-    return cfg if isinstance(cfg, dict) else {}
-
-
-def get_base_dn_for_location(location: str) -> str:
-    """
-    Strict:
-    - returns "" if location is empty or not configured
-    """
-    loc = str(location or "").strip().lower()
-    if not loc:
-        return ""
-
-    cfg = load_global_config()
-    by_loc = cfg.get("base_dn_by_location") or {}
-    if not isinstance(by_loc, dict):
-        return ""
-
-    # normalize lookup
-    val = by_loc.get(loc)
-    return str(val or "").strip()
-
-
-# -----------------------------
-# Groupmap load/save (GLOBAL)
-# groupmap.json schema:
-# {
-#   "version": 2,
-#   "locations": { "bommersheim": {}, "mitte": {} },
-#   "groups": {
-#      "Atemschutzgeräteträger": {"location":"bommersheim","ad_cn":"Bommersheim_Atemschutz"}
-#   },
-#   "notify": {...}   (wenn ihr das weiterhin nutzt)
-# }
-# -----------------------------
-def _default_groupmap() -> dict[str, Any]:
+def _default_ov_map() -> dict[str, Any]:
     return {"version": 2, "locations": {}, "groups": {}, "notify": {}}
 
 
-def _normalize_groupmap(m: Any) -> dict[str, Any]:
+def _normalize_ov_map(m: Any) -> dict[str, Any]:
     if not isinstance(m, dict):
         m = {}
-
     m.setdefault("version", 2)
     m.setdefault("locations", {})
     m.setdefault("groups", {})
@@ -79,84 +35,138 @@ def _normalize_groupmap(m: Any) -> dict[str, Any]:
     if not isinstance(m.get("notify"), dict):
         m["notify"] = {}
 
-    # normalize location keys (lowercase, stripped)
+    # locations: normalize keys to lowercase
     locs_norm: dict[str, Any] = {}
     for k, v in (m.get("locations") or {}).items():
-        kk = str(k).strip()
-        if not kk:
-            continue
-        # Keys wie "Mitte" sollen stabil auf "mitte" gehen
-        locs_norm[kk.lower()] = v if isinstance(v, dict) else {}
+        kk = str(k).strip().lower()
+        if kk:
+            locs_norm[kk] = v if isinstance(v, dict) else {}
     m["locations"] = locs_norm
 
-    # normalize groups entries (do NOT lowercase group names; HiOrg name is key)
+    # groups: keep group name as-is, normalize location/ad_cn
     groups_norm: dict[str, Any] = {}
     for gname, cfg in (m.get("groups") or {}).items():
         gg = str(gname).strip()
         if not gg:
             continue
         cc = cfg if isinstance(cfg, dict) else {}
-        # normalize location in each group to lowercase for stable join
         if "location" in cc:
             cc["location"] = str(cc.get("location") or "").strip().lower()
+        if "ad_cn" in cc:
+            cc["ad_cn"] = str(cc.get("ad_cn") or "").strip()
         groups_norm[gg] = cc
     m["groups"] = groups_norm
 
     return m
 
 
-def load_groupmap() -> dict[str, Any]:
+def _load_all() -> dict[str, Any]:
     if not GROUPMAP_PATH.exists():
-        return _default_groupmap()
+        return {"version": 3, "ovs": {}}
+
     try:
         raw = GROUPMAP_PATH.read_text(encoding="utf-8").strip()
         if not raw:
-            return _default_groupmap()
-        return _normalize_groupmap(json.loads(raw))
+            return {"version": 3, "ovs": {}}
+
+        d = json.loads(raw)
+        if not isinstance(d, dict):
+            return {"version": 3, "ovs": {}}
+
+        d.setdefault("version", 3)
+        d.setdefault("ovs", {})
+        if not isinstance(d.get("ovs"), dict):
+            d["ovs"] = {}
+
+        ovs_norm: dict[str, Any] = {}
+        for ov, ov_map in (d.get("ovs") or {}).items():
+            ok = str(ov).strip().lower()
+            if ok:
+                ovs_norm[ok] = _normalize_ov_map(ov_map)
+        d["ovs"] = ovs_norm
+        return d
     except Exception:
-        return _default_groupmap()
+        return {"version": 3, "ovs": {}}
 
 
-def save_groupmap(m: dict[str, Any]) -> None:
+def _save_all(d: dict[str, Any]) -> None:
     SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
-    normalized = _normalize_groupmap(m)
-    write_json_atomic(GROUPMAP_PATH, normalized)
+    write_json_atomic(GROUPMAP_PATH, d)
+
+
+def load_groupmap(ov: str) -> dict[str, Any]:
+    ovk = str(ov or "").strip().lower()
+    if not ovk:
+        return _default_ov_map()
+    d = _load_all()
+    ovs = d.get("ovs") or {}
+    if not isinstance(ovs, dict):
+        return _default_ov_map()
+    return _normalize_ov_map(ovs.get(ovk) or _default_ov_map())
+
+
+def save_groupmap(ov: str, m: dict[str, Any]) -> None:
+    ovk = str(ov or "").strip().lower()
+    if not ovk:
+        return
+    d = _load_all()
+    d.setdefault("version", 3)
+    d.setdefault("ovs", {})
+    if not isinstance(d["ovs"], dict):
+        d["ovs"] = {}
+    d["ovs"][ovk] = _normalize_ov_map(m)
+    _save_all(d)
 
 
 # -----------------------------
-# Helpers for resolving base_dn
+# BaseDN (zentral) aus config.json
 # -----------------------------
+def load_global_config() -> dict[str, Any]:
+    cfg = read_json(CONFIG_PATH, default={})
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def get_location_map_from_config() -> dict[str, str]:
+    """
+    location_key -> base_dn aus config.json (base_dn_by_location)
+    """
+    cfg = load_global_config()
+    by_loc = cfg.get("base_dn_by_location") or {}
+    if not isinstance(by_loc, dict):
+        return {}
+    out: dict[str, str] = {}
+    for k, v in by_loc.items():
+        kk = str(k).strip().lower()
+        vv = str(v).strip()
+        if kk and vv:
+            out[kk] = vv
+    return out
+
+
+def list_locations_from_config() -> list[dict[str, str]]:
+    """
+    FÃ¼r UI: Liste von {key, base_dn}
+    """
+    m = get_location_map_from_config()
+    return [{"key": k, "base_dn": m[k]} for k in sorted(m.keys())]
+
+
 def resolve_location_base_dn(location_key: str) -> str:
-    """
-    Strict:
-    - Location comes from groupmap "locations" or group entry
-    - BaseDN comes only from config.json (per location)
-    - No defaults
-    """
     loc = str(location_key or "").strip().lower()
     if not loc:
         return ""
-    return get_base_dn_for_location(loc)
+    return get_location_map_from_config().get(loc, "").strip()
 
 
-def resolve_group_base_dn(group_name: str) -> str:
-    """
-    Strict:
-    - reads group->location from central groupmap.json
-    - resolves via config.json base_dn_by_location
-    - returns "" if missing
-    """
-    m = load_groupmap()
+def resolve_group_base_dn(ov: str, group_name: str) -> str:
+    m = load_groupmap(ov)
     groups = m.get("groups") or {}
     if not isinstance(groups, dict):
         return ""
-
     gcfg = groups.get(group_name) or {}
     if not isinstance(gcfg, dict):
         return ""
-
     loc = str(gcfg.get("location") or "").strip().lower()
     if not loc:
         return ""
-
     return resolve_location_base_dn(loc)

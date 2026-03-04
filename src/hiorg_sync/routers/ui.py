@@ -22,6 +22,7 @@ from ..services.config_store import (
     OU_MAP_PATH,
     EMAIL_PATH,
     CONFIG_PATH,
+    LDAP_PATH,
 )
 
 router = APIRouter()
@@ -61,6 +62,17 @@ async def ui_login_post(request: Request):
         samesite="lax",
         max_age=UI_SESSION_TTL_HOURS * 3600,
     )
+    return resp
+
+
+# -----------------------------
+# Logout
+# -----------------------------
+@router.get("/ui/logout")
+def ui_logout(request: Request):
+    resp = RedirectResponse(url="/ui/login", status_code=302)
+    resp.delete_cookie("ui_session")
+    resp.delete_cookie("session")  # optional, falls du später SessionMiddleware nutzt
     return resp
 
 
@@ -321,6 +333,7 @@ async def ui_settings_email_post(request: Request):
         },
     )
 
+
 # -----------------------------
 # Settings: LDAP BaseDN (zentral, nach Standort)
 # - config.json: base_dn_by_location
@@ -368,6 +381,7 @@ async def ui_settings_ldap_post(request: Request):
     raw_json = str(form.get("base_dn_by_location_json", "") or "").strip()
 
     by_loc_norm: dict[str, str] = {}
+
     if raw_json:
         try:
             parsed = json.loads(raw_json)
@@ -401,11 +415,198 @@ async def ui_settings_ldap_post(request: Request):
             if kk and vv:
                 by_loc_norm[kk] = vv
 
+    # ✅ KRITISCH: config.json NICHT platt überschreiben -> merge/patch
+    cfg = read_json(CONFIG_PATH, default={})
+    if not isinstance(cfg, dict):
+        cfg = {}
+
+    cfg["base_dn_by_location"] = by_loc_norm
+    write_json_atomic(CONFIG_PATH, cfg)
+
+    # view fürs Template (nur der Teil)
     out_cfg = {"base_dn_by_location": by_loc_norm}
-    write_json_atomic(CONFIG_PATH, out_cfg)
 
     return _templates(request).TemplateResponse(
         "settings_ldap.html",
         {"request": request, "cfg": out_cfg, "saved": True, "error": "", "cfg_path": str(CONFIG_PATH)},
     )
 
+
+# -----------------------------
+# Settings: OV List (global)
+# - config.json: ov_list (list[str])
+# - ENV OV_LIST kann später als Override gelten (machen wir im nächsten Schritt)
+# -----------------------------
+def _parse_ov_list(raw: str) -> list[str]:
+    raw = (raw or "").strip()
+    if not raw:
+        return []
+    raw = raw.replace("\n", ",")
+    out: list[str] = []
+    seen: set[str] = set()
+    for part in raw.split(","):
+        ov = part.strip().lower()
+        if not ov or ov in seen:
+            continue
+        seen.add(ov)
+        out.append(ov)
+    return out
+
+
+@router.get("/ui/settings/ovs")
+def ui_settings_ovs_get(request: Request):
+    try:
+        require_ui_login(request)
+    except HTTPException:
+        return RedirectResponse("/ui/login?next=/ui/settings/ovs", status_code=302)
+
+    cfg = read_json(CONFIG_PATH, default={})
+    if not isinstance(cfg, dict):
+        cfg = {}
+
+    ov_list = cfg.get("ov_list")
+    if isinstance(ov_list, list):
+        raw = ",".join([str(x).strip() for x in ov_list if str(x).strip()])
+    else:
+        raw = ""
+
+    # normalize for display
+    raw = ",".join(_parse_ov_list(raw))
+
+    return _templates(request).TemplateResponse(
+        "settings_ovs.html",
+        {
+            "request": request,
+            "raw": raw,
+            "saved": False,
+            "error": "",
+            "cfg_path": str(CONFIG_PATH),
+        },
+    )
+
+
+@router.post("/ui/settings/ovs")
+async def ui_settings_ovs_post(request: Request):
+    try:
+        require_ui_login(request)
+    except HTTPException:
+        return RedirectResponse("/ui/login?next=/ui/settings/ovs", status_code=302)
+
+    form = await request.form()
+    raw = str(form.get("ov_list", "") or "")
+    ovs = _parse_ov_list(raw)
+
+    cfg = read_json(CONFIG_PATH, default={})
+    if not isinstance(cfg, dict):
+        cfg = {}
+
+    cfg["ov_list"] = ovs
+
+    # speichern ohne andere Keys zu verlieren
+    write_json_atomic(CONFIG_PATH, cfg)
+
+    return _templates(request).TemplateResponse(
+        "settings_ovs.html",
+        {
+            "request": request,
+            "raw": ",".join(ovs),
+            "saved": True,
+            "error": "",
+            "cfg_path": str(CONFIG_PATH),
+        },
+    )
+
+
+# -----------------------------
+# Settings: LDAP Verbindung (ldap.json)
+# -----------------------------
+@router.get("/ui/settings/ldap-conn")
+def ui_settings_ldap_conn_get(request: Request):
+    try:
+        require_ui_login(request)
+    except HTTPException:
+        return RedirectResponse("/ui/login?next=/ui/settings/ldap-conn", status_code=302)
+
+    cfg = read_json(LDAP_PATH, default={})
+    if not isinstance(cfg, dict):
+        cfg = {}
+
+    # Passwort niemals vorbefüllen
+    view = dict(cfg)
+    view["LDAP_BIND_PASSWORD"] = ""
+
+    # Defaults, falls noch nichts da ist (optional)
+    view.setdefault("LDAP_DEFAULT_DOMAIN", "fw-obu.de")
+    view.setdefault("LDAP_OVERWRITE_EMPTY", False)
+    view.setdefault("LDAP_ONLY_STATUS_ACTIVE", True)
+    view.setdefault("LDAP_GROUP_SYNC_REMOVE", False)
+    view.setdefault("LDAP_CREATE_ENABLED", False)
+    view.setdefault("LDAP_MOVE_IF_OU_CHANGED", True)
+    view.setdefault("LDAP_SAM_MODE", "hiorg_username")
+    view.setdefault("LDAP_SAM_USERNAME_KEY", "username")
+    view.setdefault("LDAP_UPDATE_SAM", False)
+    view.setdefault("EXCLUDE_ORGAKUERZEL", "stab04")
+
+    return _templates(request).TemplateResponse(
+        "settings_ldap_conn.html",
+        {"request": request, "cfg": view, "saved": False, "error": "", "cfg_path": str(LDAP_PATH)},
+    )
+
+
+@router.post("/ui/settings/ldap-conn")
+async def ui_settings_ldap_conn_post(request: Request):
+    try:
+        require_ui_login(request)
+    except HTTPException:
+        return RedirectResponse("/ui/login?next=/ui/settings/ldap-conn", status_code=302)
+
+    form = await request.form()
+
+    def _b(name: str, default: bool = False) -> bool:
+        v = str(form.get(name, "") or "").strip().lower()
+        if not v:
+            return default
+        return v in ("1", "true", "yes", "on")
+
+    old_cfg = read_json(LDAP_PATH, default={})
+    if not isinstance(old_cfg, dict):
+        old_cfg = {}
+
+    new_cfg = {
+        "LDAP_URL": str(form.get("LDAP_URL", "") or "").strip(),
+        "LDAP_BIND_USER": str(form.get("LDAP_BIND_USER", "") or "").strip(),
+        "LDAP_DEFAULT_DOMAIN": str(form.get("LDAP_DEFAULT_DOMAIN", "") or "").strip(),
+        "SYNC_AD_URL": str(form.get("SYNC_AD_URL", "") or "").strip(),
+
+        "LDAP_OVERWRITE_EMPTY": _b("LDAP_OVERWRITE_EMPTY", False),
+        "LDAP_ONLY_STATUS_ACTIVE": _b("LDAP_ONLY_STATUS_ACTIVE", True),
+        "LDAP_GROUP_SYNC_REMOVE": _b("LDAP_GROUP_SYNC_REMOVE", False),
+        "LDAP_CREATE_ENABLED": _b("LDAP_CREATE_ENABLED", False),
+        "LDAP_MOVE_IF_OU_CHANGED": _b("LDAP_MOVE_IF_OU_CHANGED", True),
+
+        "LDAP_SAM_MODE": str(form.get("LDAP_SAM_MODE", "hiorg_username") or "hiorg_username").strip().lower(),
+        "LDAP_SAM_USERNAME_KEY": str(form.get("LDAP_SAM_USERNAME_KEY", "username") or "username").strip(),
+        "LDAP_UPDATE_SAM": _b("LDAP_UPDATE_SAM", False),
+
+        "EXCLUDE_ORGAKUERZEL": str(form.get("EXCLUDE_ORGAKUERZEL", "stab04") or "stab04").strip(),
+    }
+
+    # Passwort nur überschreiben wenn eingegeben
+    pw = str(form.get("LDAP_BIND_PASSWORD", "") or "").strip()
+    if pw:
+        new_cfg["LDAP_BIND_PASSWORD"] = pw
+    else:
+        old_pw = str(old_cfg.get("LDAP_BIND_PASSWORD", "") or "").strip()
+        if old_pw:
+            new_cfg["LDAP_BIND_PASSWORD"] = old_pw
+
+    write_json_atomic(LDAP_PATH, new_cfg)
+
+    # View: Passwort wieder leer
+    view = dict(new_cfg)
+    view["LDAP_BIND_PASSWORD"] = ""
+
+    return _templates(request).TemplateResponse(
+        "settings_ldap_conn.html",
+        {"request": request, "cfg": view, "saved": True, "error": "", "cfg_path": str(LDAP_PATH)},
+    )

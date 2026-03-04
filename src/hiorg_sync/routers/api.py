@@ -1,3 +1,4 @@
+# src/hiorg_sync/routers/api.py
 from __future__ import annotations
 
 import os
@@ -8,14 +9,17 @@ import urllib.error
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
-
 from starlette.concurrency import run_in_threadpool
 
 from ..core.security import require_api_or_ui
 from ..core.settings import require_ov
-
 from ..services.hiorg import refresh_tokens, fetch_personal_updated_since
-from ..services.groupmap_store import load_groupmap, save_groupmap
+from ..services.groupmap_store import (
+    load_groupmap,
+    save_groupmap,
+    list_locations_from_config,        # muss existieren
+    get_location_map_from_config,      # muss existieren (oder unten rausnehmen)
+)
 
 router = APIRouter()
 
@@ -34,7 +38,6 @@ EXCLUDE_ORGAKUERZEL = {
 LDAP_ONLY_STATUS_ACTIVE = os.getenv("LDAP_ONLY_STATUS_ACTIVE", "true").lower() in ("1", "true", "yes")
 
 
-# --- small helpers (previously in legacy) ---
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -76,8 +79,14 @@ def _do_sync_call(url: str, api_key: str) -> tuple[int, str]:
         body = e.read().decode("utf-8", errors="replace")
         return e.code, body
 
+
 @router.get("/api/groups")
 def api_groups(request: Request, ov: str, days: int = 3650):
+    """
+    Discovery für Gruppen/Standorte (für UI):
+    - strikt pro OV: orgakuerzel muss == ov sein
+    - optional: Standort kommt aus person.attributes[HIORG_LOCATION_KEY] oder aus "loc :: group" split
+    """
     require_api_or_ui(request)
     require_ov(ov)
 
@@ -86,17 +95,25 @@ def api_groups(request: Request, ov: str, days: int = 3650):
     if not access:
         raise HTTPException(500, f"No access_token after refresh for ov '{ov}'")
 
-    # Discovery unabhängig vom Sync-Marker (damit UI alles sieht)
     marker = iso(now_utc() - timedelta(days=days))
     people = fetch_personal_updated_since(access, marker)
 
     found: dict[str, dict] = {}
+    ov_lc = ov.lower().strip()
 
     for p in people:
         attrs = p.get("attributes") or {}
 
-        if (attrs.get("orgakuerzel") or "").lower() in EXCLUDE_ORGAKUERZEL:
+        org = str(attrs.get("orgakuerzel", "") or "").lower().strip()
+
+        # 1) HARTER OV-FILTER: nur dieses OV
+        if org != ov_lc:
             continue
+
+        # 2) generelle Excludes weiterhin beachten
+        if org in EXCLUDE_ORGAKUERZEL:
+            continue
+
         if LDAP_ONLY_STATUS_ACTIVE and (attrs.get("status") != "aktiv"):
             continue
 
@@ -108,7 +125,8 @@ def api_groups(request: Request, ov: str, days: int = 3650):
                 continue
 
             loc2, g2 = split_group_location(g)
-            loc_final = loc or loc2 or "Unbekannt"
+            loc_final = (loc or loc2 or "Unbekannt").strip() or "Unbekannt"
+
             found.setdefault(g2, {"locations": set()})["locations"].add(loc_final)
 
     out = [{"group": k, "locations": sorted(list(v["locations"]))} for k, v in sorted(found.items())]
@@ -117,9 +135,12 @@ def api_groups(request: Request, ov: str, days: int = 3650):
 
 @router.get("/api/groupmap")
 def api_groupmap_get(request: Request, ov: str):
+    """
+    Groupmap: ZENTRAL gespeichert, aber pro OV getrennt.
+    """
     require_api_or_ui(request)
     require_ov(ov)
-    return {"ov": ov, "map": load_groupmap()}
+    return {"ov": ov, "map": load_groupmap(ov)}
 
 
 @router.post("/api/groupmap")
@@ -132,10 +153,16 @@ async def api_groupmap_post(request: Request, ov: str):
     if not isinstance(m, dict):
         raise HTTPException(400, "body.map must be a dict")
 
-    save_groupmap(m)
+    save_groupmap(ov, m)
     return {"ok": True}
-    
-    
+
+
+@router.get("/api/ldap/locations")
+def api_ldap_locations(request: Request):
+    require_api_or_ui(request)
+    return {"locations": list_locations_from_config()}
+
+
 @router.post("/api/sync/ad/run")
 async def run_sync_ad(
     request: Request,
@@ -162,11 +189,9 @@ async def run_sync_ad(
 
     async def _runner():
         status, body = await run_in_threadpool(_do_sync_call, url, api_key)
-        # optional: loggen, damit du Ergebnis siehst
         print(f"[sync/ad] ov={ov} full={full} dry={dry_run} -> {status}")
         if status != 200:
             print(body[:2000])
 
     background_tasks.add_task(_runner)
-
     return {"ok": True, "started": True, "ov": ov, "full": bool(full), "dry_run": bool(dry_run)}

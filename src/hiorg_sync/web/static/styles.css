@@ -1,3 +1,6 @@
+/* /static/styles.css (clean + consistent) */
+
+/* ===== Theme ===== */
 :root{
   --fw-red:#c8102e;
   --fw-red-dark:#a30d25;
@@ -5,31 +8,45 @@
 
   --fw-glass: rgba(16, 28, 44, 0.82);
   --fw-line: rgba(255,255,255,.20);
+
   --fw-text: rgba(255,255,255,.94);
   --fw-text-dim: rgba(255,255,255,.72);
 
   --fw-blue-ring: rgba(40,160,255,.95);
   --fw-blue-ring-soft: rgba(40,160,255,.35);
+
+  --fw-bg-input: rgba(8, 14, 24, 0.55);
+  --fw-row-sep: rgba(255,255,255,0.08);
+  --fw-row-hover: rgba(255,255,255,0.04);
 }
 
+/* ===== Base ===== */
 *{ box-sizing:border-box; }
 html,body{ height:100%; }
+
 body{
   margin:0;
   color:var(--fw-text);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 
-  /* Hintergrund wie bei Keycloak */
+  /* Hintergrund */
   background: url("/static/img/background_fw.png") no-repeat center center fixed;
   background-size: cover;
 }
 
-/* ===== Layout / Card ===== */
+/* ===== Layout ===== */
 .fwWrap{
   min-height:100vh;
   padding: clamp(14px, 3vw, 28px);
   display:grid;
   place-items: start center;
+}
+
+.fwTop{
+  width: min(1200px, 96vw);
+  display:flex;
+  justify-content:flex-end;
+  margin: 0 0 10px 0;
 }
 
 .fwCard{
@@ -59,37 +76,75 @@ body{
   opacity:.18;
 }
 
-/* ===== Typo ===== */
+/* ===== Typography ===== */
+h1,h2,h3{ margin:0; }
 .fwTitle{
   margin: 0 0 10px 0;
   font-size: 26px;
   font-weight: 900;
+  letter-spacing: .2px;
 }
+
 .fwHint{
   color: var(--fw-text-dim);
   font-size: 13px;
+  line-height: 1.35;
 }
 
-/* ===== Inputs / Select ===== */
-.fwInput{
+code{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--fw-line);
+  background: rgba(8,14,24,.45);
+  color: var(--fw-text);
+}
+
+/* ===== Inputs / Select / Textarea ===== */
+.fwInput,
+select.fwInput,
+textarea.fwInput{
   width:100%;
   height:46px;
   padding: 10px 12px;
   border-radius:14px;
   border:1px solid var(--fw-line);
-  background: rgba(8, 14, 24, 0.55);
+  background: var(--fw-bg-input);
   color:#fff;
   outline:none;
+  min-width: 0;
+  appearance: none;
 }
+
+textarea.fwInput{
+  height:auto;
+  min-height: 92px;
+  padding: 12px;
+  resize: vertical;
+}
+
 .fwInput:focus{
   border-color: var(--fw-red);
   box-shadow: 0 0 0 4px var(--fw-focus);
 }
 
-.fwRow input{
-  width: 100%;
-  min-width: 0;           /* ganz wichtig im Grid */
-  box-sizing: border-box;
+/* placeholder */
+.fwInput::placeholder{
+  color: rgba(255,255,255,.45);
+}
+
+/* select arrow */
+select.fwInput{
+  padding-right: 36px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(255,255,255,.65) 50%),
+    linear-gradient(135deg, rgba(255,255,255,.65) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 19px,
+    calc(100% - 12px) 19px;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
 /* ===== Buttons ===== */
@@ -100,6 +155,8 @@ body{
   border:1px solid transparent;
   cursor:pointer;
   font-weight:800;
+  transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+  user-select:none;
 }
 
 .fwBtn{
@@ -113,6 +170,7 @@ body{
   box-shadow: 0 12px 26px rgba(200,16,46,.28);
   transform: translateY(-1px);
 }
+.fwBtn:active{ transform: translateY(0px); }
 
 .fwBtn2{
   background: rgba(8,14,24,.45);
@@ -122,8 +180,27 @@ body{
 .fwBtn2:hover{
   border-color: rgba(40,160,255,.55);
   box-shadow: 0 0 0 4px rgba(40,160,255,.16);
+  transform: translateY(-1px);
+}
+.fwBtn2:active{ transform: translateY(0px); }
+
+/* Link as button */
+a.fwBtn2, a.fwBtn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+  line-height:1;
 }
 
+/* Logout button smaller */
+.fwLogout{
+  height:38px;
+  padding:0 14px;
+  font-weight:800;
+}
+
+/* ===== Topbar (page header row) ===== */
 .topbar{
   display:flex;
   align-items:center;
@@ -132,28 +209,18 @@ body{
   margin-bottom:14px;
 }
 
-/* wichtig: Titel darf schrumpfen, Button nicht */
 .topbar h1{
   margin:0;
   min-width: 0;
 }
 
 .btn-back{
-  margin-left: auto;     /* schiebt ihn nach ganz rechts */
-  flex: 0 0 auto;        /* nicht schrumpfen */
-  white-space: nowrap;   /* kein Zeilenumbruch */
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
-
-/* Link als Button */
-a.fwBtn2{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  text-decoration:none;
-  line-height:1;
-}
-
+/* ===== Actions (button row) ===== */
 .actions{
   display:flex;
   gap:10px;
@@ -161,24 +228,283 @@ a.fwBtn2{
   margin-bottom: 16px;
 }
 
-/* ===== Groupmap Grid ===== */
+/* ===== Generic rows (settings/notify lists) ===== */
 .fwRow{
   display:grid;
-  grid-template-columns: minmax(260px, 2.2fr) minmax(140px, 1fr) minmax(280px, 2fr) minmax(240px, 1.8fr);
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid var(--fw-row-sep);
   align-items: center;
 }
+.fwRow:hover{ background: var(--fw-row-hover); }
 .fwHdr{
   font-weight:900;
   border-bottom: 2px solid rgba(255,255,255,.22);
   padding-bottom: 10px;
+  background: transparent;
+}
+.fwHdr:hover{ background: transparent; }
+
+/* ===== Notify grid (4 columns) ===== */
+.notifyGrid .fwRow{
+  grid-template-columns: minmax(140px, 1fr) minmax(220px, 2fr) minmax(240px, 2fr) minmax(180px, 1fr);
 }
 
+/* ===== Groupmap table (3 columns, fixed alignment) ===== */
+.gmTable{
+  margin-top: 6px;
+}
 
+.gmRow{
+  display:grid;
+  grid-template-columns: minmax(260px, 2fr) minmax(220px, 1fr) minmax(320px, 2fr);
+  gap:10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--fw-row-sep);
+  align-items:center;
+}
+.gmRow:hover{ background: var(--fw-row-hover); }
+
+.gmHdr{
+  font-weight:900;
+  border-bottom: 2px solid rgba(255,255,255,.22);
+  padding-bottom: 10px;
+  position: sticky; /* nice UX in long lists */
+  top: 0;
+  background: rgba(16, 28, 44, 0.92);
+  backdrop-filter: blur(10px);
+  z-index: 2;
+}
+
+/* Groupmap cell: group name */
+.gmName{
+  color: var(--fw-text-dim);
+  font-size: 13px;
+  display:flex;
+  align-items:center;
+}
+
+/* Make inputs inside grid never overflow */
+.gmRow .fwInput,
+.fwRow .fwInput{
+  min-width:0;
+}
+
+/* ===== Page container (optional) ===== */
 .fwPage{
   max-width: 1200px;
   margin: 0 auto;
   padding: 22px 22px 28px;
+}
+
+/* ===== Small screens ===== */
+@media (max-width: 860px){
+  .fwCard{ border-radius: 18px; }
+  .gmRow, .gmHdr{
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .notifyGrid .fwRow{
+    grid-template-columns: 1fr;
+  }
+  .actions{ gap:8px; }
+  .fwBtn,.fwBtn2{ width:100%; }
+  .topbar{ flex-wrap: wrap; }
+}
+
+
+/* ===== Gruppen-Mapping: saubere Tabelle ===== */
+
+.gmTable{
+  width: 100%;
+  margin-top: 6px;
+  display: grid;
+  gap: 8px;
+}
+
+/* Header UND Zeilen haben exakt gleiches Grid */
+.gmRow{
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.35fr) minmax(260px, 0.95fr) minmax(360px, 1.7fr);
+  gap: 14px;
+  align-items: center;
+
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 16px;
+  background: rgba(8, 14, 24, 0.28);
+}
+
+/* Header-Styling */
+.gmRow.gmHdr{
+  background: rgba(8, 14, 24, 0.05);
+  border: 1px solid rgba(255,255,255,0.14);
+  font-weight: 900;
+}
+
+/* Gruppe-Name links */
+.gmName{
+  font-weight: 800;
+  color: rgba(255,255,255,0.92);
+  line-height: 1.15;
+  padding-right: 6px;
+}
+
+/* Controls: gleiche Höhe + nicht ausfransen */
+.gmRow .fwInput{
+  height: 44px;
+}
+
+/* Select/Text kürzen, sonst zerschießt BaseDN die Optik */
+.gmRow select.fwInput{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Optional: Zeilen-Hover für bessere Lesbarkeit */
+.gmRow:not(.gmHdr):hover{
+  border-color: rgba(40,160,255,0.35);
+  background: rgba(8, 14, 24, 0.38);
+}
+
+/* Mobile: Spalten untereinander */
+@media (max-width: 900px){
+  .gmRow{
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .gmRow.gmHdr{
+    display: none; /* Header ausblenden, weil jede Zeile dann selbsterklärend ist */
+  }
+}
+/* ===== Dashboard ===== */
+
+.dashTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ovBadge{
+  display:inline-flex;
+  align-items:center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(8, 14, 24, 0.55);
+  font-weight: 800;
+  letter-spacing: .3px;
+  margin-left: 6px;
+}
+
+.dashGrid{
+  margin-top: 18px;
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 820px){
+  .dashGrid{ grid-template-columns: 1fr; }
+}
+
+.dashCard{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  padding: 14px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(8, 14, 24, 0.30);
+  text-decoration:none;
+  color: var(--fw-text);
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+
+.dashCard:hover{
+  transform: translateY(-1px);
+  border-color: rgba(40,160,255,0.40);
+  background: rgba(8, 14, 24, 0.38);
+  box-shadow: 0 0 0 4px rgba(40,160,255,.12);
+}
+
+.dashIcon{
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display:grid;
+  place-items:center;
+  background: rgba(8,14,24,.55);
+  border: 1px solid rgba(255,255,255,.12);
+  font-size: 20px;
+  flex: 0 0 auto;
+}
+
+.dashText{
+  min-width: 0;
+  display:flex;
+  flex-direction:column;
+  gap: 2px;
+}
+
+.dashTitle{
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.dashSub{
+  color: var(--fw-text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashGo{
+  margin-left: auto;
+  opacity: .75;
+  font-weight: 900;
+  padding-left: 10px;
+}
+
+.dashFoot{
+  margin-top: 14px;
+}
+
+
+/* ===== Key/Value Tabelle (LDAP BaseDN) ===== */
+.kvRow{
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(360px, 3fr) 160px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.kvHdr{
+  font-weight: 900;
+  border-bottom: 2px solid rgba(255,255,255,.22);
+  padding-bottom: 10px;
+}
+
+.kvRow .fwBtn2{
+  justify-self: end;
+  width: auto;
+}
+
+/* Mobile: untereinander */
+@media (max-width: 820px){
+  .kvRow{
+    grid-template-columns: 1fr;
+  }
+  .kvRow .fwBtn2{
+    width: 100%;
+    justify-self: stretch;
+  }
 }

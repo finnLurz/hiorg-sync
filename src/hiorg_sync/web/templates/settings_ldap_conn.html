@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="topbar">
+  <h1 class="fwTitle">LDAP / Verbindung</h1>
+  <a class="fwBtn2 btn-back" href="/ui/">? Zurück</a>
+</div>
+
+<div class="fwHint" style="margin-top:6px;">
+  Hier konfigurierst du die LDAP/AD Verbindung. (Werte können später optional durch ENV überschrieben werden.)
+</div>
+
+<form method="post" action="/ui/settings/ldap-conn" style="margin-top:16px;">
+
+  <h3 style="margin: 18px 0 10px;">Verbindung</h3>
+
+  <div class="kvRow fwHdr">
+    <div>Feld</div>
+    <div>Wert</div>
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">LDAP URL</div>
+    <input class="fwInput" name="LDAP_URL" placeholder="ldaps://server:636" value="{{ cfg.get('LDAP_URL','') }}">
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Bind User (UPN)</div>
+    <input class="fwInput" name="LDAP_BIND_USER" placeholder="account@domain.tld" value="{{ cfg.get('LDAP_BIND_USER','') }}">
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Bind Passwort</div>
+    <input class="fwInput" type="password" name="LDAP_BIND_PASSWORD" placeholder="(leer lassen = unverändert)" value="">
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Default Domain</div>
+    <input class="fwInput" name="LDAP_DEFAULT_DOMAIN" placeholder="domain.tld" value="{{ cfg.get('LDAP_DEFAULT_DOMAIN','') }}">
+    <div></div>
+  </div>
+
+
+
+  <h3 style="margin: 22px 0 10px;">Flags</h3>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Leere Werte überschreiben (Telefonnummern u.a.)</div>
+    <label style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" name="LDAP_OVERWRITE_EMPTY" value="1" {% if cfg.get('LDAP_OVERWRITE_EMPTY') %}checked{% endif %}>
+      <span class="fwHint">LDAP_OVERWRITE_EMPTY</span>
+    </label>
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Nur aktive User (Nur in HiOrg-Aktive User werden übertragen)</div>
+    <label style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" name="LDAP_ONLY_STATUS_ACTIVE" value="1" {% if cfg.get('LDAP_ONLY_STATUS_ACTIVE') %}checked{% endif %}>
+      <span class="fwHint">LDAP_ONLY_STATUS_ACTIVE</span>
+    </label>
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Group Sync Remove (Wenn in HiOrg Gruppenberechtigungen entzogen werden, so werden diese in der AD auch entzogen)</div>
+    <label style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" name="LDAP_GROUP_SYNC_REMOVE" value="1" {% if cfg.get('LDAP_GROUP_SYNC_REMOVE') %}checked{% endif %}>
+      <span class="fwHint">LDAP_GROUP_SYNC_REMOVE</span>
+    </label>
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">User automatisch aktiviert hinterlegen, oder deaktiviert</div>
+    <label style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" name="LDAP_CREATE_ENABLED" value="1" {% if cfg.get('LDAP_CREATE_ENABLED') %}checked{% endif %}>
+      <span class="fwHint">LDAP_CREATE_ENABLED</span>
+    </label>
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Move if OU changed</div>
+    <label style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" name="LDAP_MOVE_IF_OU_CHANGED" value="1" {% if cfg.get('LDAP_MOVE_IF_OU_CHANGED') %}checked{% endif %}>
+      <span class="fwHint">LDAP_MOVE_IF_OU_CHANGED</span>
+    </label>
+    <div></div>
+  </div>
+
+  <h3 style="margin: 22px 0 10px;">sAMAccountName</h3>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">SAM Mode</div>
+    <select class="fwInput" name="LDAP_SAM_MODE">
+      <option value="hiorg_username" {% if cfg.get('LDAP_SAM_MODE')=='hiorg_username' %}selected{% endif %}>hiorg_username</option>
+      <option value="vorname.nachname" {% if cfg.get('LDAP_SAM_MODE')=='vorname.nachname' %}selected{% endif %}>vorname.nachname</option>
+    </select>
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">SAM Username Key</div>
+    <input class="fwInput" name="LDAP_SAM_USERNAME_KEY" placeholder="username" value="{{ cfg.get('LDAP_SAM_USERNAME_KEY','') }}">
+    <div></div>
+  </div>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Update SAM</div>
+    <label style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" name="LDAP_UPDATE_SAM" value="1" {% if cfg.get('LDAP_UPDATE_SAM') %}checked{% endif %}>
+      <span class="fwHint">LDAP_UPDATE_SAM</span>
+    </label>
+    <div></div>
+  </div>
+
+  <h3 style="margin: 22px 0 10px;">Sonstiges</h3>
+
+  <div class="kvRow">
+    <div class="fwHint" style="align-self:center;">Exclude Orgakürzel</div>
+    <input class="fwInput" name="EXCLUDE_ORGAKUERZEL" placeholder="AusgeschlosseneORGA" value="{{ cfg.get('EXCLUDE_ORGAKUERZEL','') }}">
+    <div></div>
+  </div>
+
+  {% if error %}
+    <div class="fwHint" style="margin-top:12px; color:#ff6b6b;">{{ error }}</div>
+  {% endif %}
+  {% if saved %}
+    <div class="fwHint" style="margin-top:12px;">? Gespeichert.</div>
+  {% endif %}
+
+  <div style="margin-top: 14px; display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="fwBtn" type="submit">Speichern</button>
+    <a class="fwBtn2" href="/ui/">Abbrechen</a>
+  </div>
+
+  <div class="fwHint" style="margin-top: 10px;">
+    Datei: {{ cfg_path }}
+  </div>
+
+</form>
+
+{% endblock %}

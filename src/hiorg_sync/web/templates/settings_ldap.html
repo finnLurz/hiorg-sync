@@ -1,93 +1,102 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="topbar">
-    <h1 class="fwTitle">LDAP / BaseDN</h1>
-    <a class="fwBtn2 btn-back" href="/ui/">← Zurück</a>
+
+<div class="topbar">
+  <h1 class="fwTitle">LDAP / BaseDN</h1>
+  <a class="fwBtn2 btn-back" href="/ui/">← Zurück</a>
+</div>
+
+<div class="fwHint" style="margin-top: 6px;">
+  Zentrale BaseDN-Konfiguration <b>pro Standort</b> (für Gruppen).<br>
+  Keine Defaults: Wenn ein Standort nicht gepflegt ist, wird keine Gruppe aufgelöst.
+</div>
+
+<form method="post" action="/ui/settings/ldap" onsubmit="prepareSubmit()">
+  <h3 style="margin: 18px 0 10px;">Standorte</h3>
+
+  <div class="kvRow kvHdr">
+    <div>Standort</div>
+    <div>BaseDN</div>
+    <div></div>
   </div>
 
-  <div class="fwHint" style="margin-top: 6px;">
-    Zentrale BaseDN-Konfiguration <b>pro Standort</b> (für Gruppen).<br>
-    Keine Defaults: Wenn ein Standort nicht gepflegt ist, wird keine Gruppe aufgelöst.
+  <div id="locRows"></div>
+
+  <div style="margin-top: 10px;">
+    <button class="fwBtn2" type="button" onclick="addRow('', '')">+ Standort</button>
   </div>
 
-  <form method="post" action="/ui/settings/ldap">
-    <h3 style="margin: 18px 0 10px;">Standorte</h3>
-
-    <div class="fwRow fwHdr">
-      <div>Standort</div>
-      <div>BaseDN</div>
-      <div></div>
+  {% if error %}
+    <div class="fwHint" style="margin-top: 10px; color: #ff6b6b;">
+      {{ error }}
     </div>
+  {% endif %}
 
-    <div id="locRows"></div>
-
-    <div style="margin-top: 10px;">
-      <button class="fwBtn2" type="button" onclick="addRow('', '')">+ Standort</button>
-    </div>
-
-    {% if error %}
-      <div class="fwHint" style="margin-top: 10px; color: #b00020;">
-        {{ error }}
-      </div>
-    {% endif %}
-
-    {% if saved %}
-      <div class="fwHint" style="margin-top: 10px;">
-        ✅ Gespeichert.
-      </div>
-    {% endif %}
-
-    <input type="hidden" name="base_dn_by_location_json" id="payload">
-
-    <div style="margin-top: 14px; display: flex; gap: 10px;">
-      <button class="fwBtn" type="submit" onclick="prepareSubmit()">Speichern</button>
-      <a class="fwBtn2" href="/ui/">Abbrechen</a>
-    </div>
-
+  {% if saved %}
     <div class="fwHint" style="margin-top: 10px;">
-      Datei: {{ cfg_path or "DATA_DIR/settings/config.json" }}
+      ✅ Gespeichert.
     </div>
-  </form>
+  {% endif %}
 
-  <script>
-    const initial = {{ (cfg.get('base_dn_by_location') or {}) | tojson }};
+  <input type="hidden" name="base_dn_by_location_json" id="payload">
 
-    function esc(s) {
-      return String(s ?? '').replace(/"/g, '&quot;');
+  <div class="actions" style="margin-top: 14px;">
+    <button class="fwBtn" type="submit">Speichern</button>
+    <a class="fwBtn2" href="/ui/">Abbrechen</a>
+  </div>
+
+  <div class="fwHint" style="margin-top: 10px;">
+    Datei: {{ cfg_path or "DATA_DIR/settings/config.json" }}
+  </div>
+</form>
+
+<script>
+  const initial = {{ (cfg.get('base_dn_by_location') or {}) | tojson }};
+
+  function escAttr(s) {
+    // für value="" Attribute sicher escapen
+    return String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+  }
+
+  function addRow(loc, dn) {
+    const wrap = document.getElementById("locRows");
+    const row = document.createElement("div");
+    row.className = "kvRow";
+
+    row.innerHTML = `
+      <input class="fwInput locKey" placeholder="z.B. mitte" value="${escAttr(loc)}">
+      <input class="fwInput locDn" placeholder="OU=Gruppen,OU=...,DC=..." value="${escAttr(dn)}">
+      <button class="fwBtn2" type="button" onclick="this.closest('.kvRow').remove()">Entfernen</button>
+    `;
+
+    wrap.appendChild(row);
+  }
+
+  function prepareSubmit() {
+    const keys = Array.from(document.querySelectorAll(".locKey"));
+    const dns  = Array.from(document.querySelectorAll(".locDn"));
+
+    const out = {};
+    for (let i = 0; i < keys.length; i++) {
+      const k = (keys[i].value || "").trim().toLowerCase();
+      const v = (dns[i].value || "").trim();
+      if (k && v) out[k] = v;
     }
 
-    function addRow(loc, dn) {
-      const wrap = document.getElementById("locRows");
-      const row = document.createElement("div");
-      row.className = "fwRow";
+    document.getElementById("payload").value = JSON.stringify(out, null, 2);
+  }
 
-      row.innerHTML = `
-        <input class="fwInput locKey" placeholder="z.B. Mitte" value="${esc(loc)}">
-        <input class="fwInput locDn" placeholder="OU=Gruppen,OU=...,DC=..." value="${esc(dn)}">
-        <button class="fwBtn2" type="button" onclick="this.closest('.fwRow').remove()">Entfernen</button>
-      `;
-      wrap.appendChild(row);
-    }
+  // initial render
+  const entries = Object.entries(initial || {});
+  if (entries.length === 0) {
+    addRow("", "");
+  } else {
+    for (const [k, v] of entries) addRow(k, v);
+  }
+</script>
 
-    function prepareSubmit() {
-      const keys = Array.from(document.querySelectorAll(".locKey"));
-      const dns  = Array.from(document.querySelectorAll(".locDn"));
-
-      const out = {};
-      for (let i = 0; i < keys.length; i++) {
-        const k = (keys[i].value || "").trim().toLowerCase();
-        const v = (dns[i].value || "").trim();
-        if (k && v) out[k] = v;
-      }
-      document.getElementById("payload").value = JSON.stringify(out, null, 2);
-    }
-
-    // initial render
-    const entries = Object.entries(initial);
-    if (entries.length === 0) {
-      addRow("", "");
-    } else {
-      for (const [k, v] of entries) addRow(k, v);
-    }
-  </script>
 {% endblock %}

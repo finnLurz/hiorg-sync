@@ -85,18 +85,19 @@ def _normalize_ou_map(raw: Any) -> dict[str, str]:
 def load_ou_map() -> dict[str, str]:
     """
     Priority:
-    1) Env override via LDAP_OU_MAP_JSON (Notfall/Hard override)
-    2) Persisted file (OU_MAP_PATH) e.g. DATA_DIR/settings/ou_map.json
+    1) ENV override (LDAP_OU_MAP_JSON / LDAP_OU_MAP) if non-empty and not "{}"
+    2) Persisted file OU_MAP_PATH (UI)
     """
-    # 1) env override
-    if str(LDAP_OU_MAP_JSON or "").strip():
+    env_raw = str(LDAP_OU_MAP_JSON or "").strip()
+
+    # treat "{}" as empty
+    if env_raw and env_raw not in ("{}", "null", "None"):
         try:
-            m = json.loads(LDAP_OU_MAP_JSON or "{}")
+            m = json.loads(env_raw)
             return _normalize_ou_map(m)
         except Exception:
             return {}
 
-    # 2) persisted file
     m = read_json(OU_MAP_PATH, default={})
     return _normalize_ou_map(m)
 

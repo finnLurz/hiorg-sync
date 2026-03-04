@@ -1,30 +1,82 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1 class="fwTitle">HiOrg-Sync</h1>
 
-  {% if current_ov %}
-    <div class="fwHint" style="margin-top: 6px;">
-      Aktive OV im Browser: <b>{{ current_ov }}</b>
-    </div>
-  {% else %}
-    <div class="fwHint" style="margin-top: 6px;">
-      Keine OV gewählt (für Gruppenmapping nötig).
-    </div>
-  {% endif %}
+<div class="dashTop">
+  <div>
+    <h1 class="fwTitle">HiOrg-Sync</h1>
 
-  <div style="margin-top: 16px; display: grid; grid-template-columns: 1fr; gap: 10px;">
-    <a class="fwBtn" href="/ui/ov">OV auswählen</a>
-
-    <a class="fwBtn" href="/ui/groupmap">Gruppenmapping</a>
-
-    <a class="fwBtn" href="/ui/settings/ou-map">LDAP OU-Mapping (OV ? User-OU)</a>
-
-    <a class="fwBtn" href="/ui/settings/email">E-Mail / Benachrichtigungen (SMTP)</a>
-
-    <a class="fwBtn" href="/ui/settings/ldap">LDAP BaseDN (zentral)</a>
+    {% if current_ov %}
+      <div class="fwHint">Aktive OV im Browser:
+        <span class="ovBadge">{{ current_ov }}</span>
+      </div>
+    {% else %}
+      <div class="fwHint">Keine OV gewählt (für Gruppenmapping nötig).</div>
+    {% endif %}
   </div>
+</div>
 
-  <div class="fwHint" style="margin-top: 14px;">
-    Tipp: OU-Mapping & SMTP sind global. Gruppenmapping ist pro OV.
+<div class="dashGrid">
+
+  <a class="dashCard" href="/ui/settings/ovs">
+    <div class="dashIcon">🏢️</div>
+    <div class="dashText">
+      <div class="dashTitle">HiOrg Ov´s hinterlegen</div>
+      <div class="dashSub">Alle OV´s welche abgerufen werden sollen, können hier hinterlegt werden</div>
+    </div>
+    <div class="dashGo">→</div>
+  </a>
+
+
+<a class="dashCard" href="/ui/settings/ldap-conn">
+  <div class="dashIcon">🔌</div>
+  <div class="dashText">
+    <div class="dashTitle">LDAP Verbindung</div>
+    <div class="dashSub">Server, Bind-User, Optionen</div>
   </div>
+  <div class="dashGo">→</div>
+</a>
+
+
+
+  <a class="dashCard" href="/ui/ov">
+    <div class="dashIcon">🏷️</div>
+    <div class="dashText">
+      <div class="dashTitle">OV auswählen</div>
+      <div class="dashSub">Aktive OV im Browser setzen</div>
+    </div>
+    <div class="dashGo">→</div>
+  </a>
+
+  <a class="dashCard" href="/ui/settings/ou-map">
+    <div class="dashIcon">🗂️</div>
+    <div class="dashText">
+      <div class="dashTitle">LDAP OU-Mapping</div>
+      <div class="dashSub">OV → User-OU Zuordnung - Hier kann die Gruppenzuordnung von OV´s zu einzelnen AD-Ordnern festgelegt werden</div>
+    </div>
+    <div class="dashGo">→</div>
+  </a>
+
+  <a class="dashCard" href="/ui/settings/email">
+    <div class="dashIcon">✉️</div>
+    <div class="dashText">
+      <div class="dashTitle">E-Mail / Benachrichtigungen</div>
+      <div class="dashSub">SMTP + Absender konfigurieren</div>
+    </div>
+    <div class="dashGo">→</div>
+  </a>
+
+  <a class="dashCard" href="/ui/settings/ldap">
+    <div class="dashIcon">🧩</div>
+    <div class="dashText">
+      <div class="dashTitle">LDAP BaseDN Gruppenzuordnung</div>
+      <div class="dashSub">Standorte → BaseDN verwalten - Hier können Gruppenzugehörigkeiten mit der AD synchronisiert werden</div>
+    </div>
+    <div class="dashGo">→</div>
+  </a>
+</div>
+
+<div class="fwHint dashFoot">
+  Tipp: OU-Mapping & SMTP sind global. Gruppenmapping ist pro OV.
+</div>
+
 {% endblock %}
