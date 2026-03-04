@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title or "HiOrg-Sync" }}</title>
-
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
-  <!-- optional: fuer schnelle Anpassungen ohne styles.css anzufassen -->
   <link rel="stylesheet" href="/static/custom.css">
 </head>
 <body>
@@ -15,6 +16,10 @@
 
       {% if request.cookies.get("ui_session") %}
         <div class="fwCardTop">
+          <div class="appBrand">
+            <span class="appLogo">⚡</span>
+            <span class="appName">HiOrg-Sync</span>
+          </div>
           <a class="fwBtn2 fwLogout" href="/ui/logout">Logout</a>
         </div>
       {% endif %}
@@ -23,5 +28,4 @@
     </div>
   </div>
 </body>
-
 </html>
