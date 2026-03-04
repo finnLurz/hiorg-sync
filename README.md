@@ -15,6 +15,7 @@
 - [API-Referenz](#api-referenz)
 - [Troubleshooting](#troubleshooting)
 - [Leitprinzipien](#leitprinzipien)
+- [Lizenz](#lizenz)
 
 ---
 
@@ -309,3 +310,21 @@ Pro Lauf werden nur Änderungen seit dem letzten Sync verarbeitet (`updated_sinc
 
 **Kontrollierbarkeit und Transparenz.**
 Dry-Run-Modus, Debug-Endpunkte und strukturierte Logs sorgen dafür, dass jede Änderung nachvollziehbar ist, bevor sie ausgeführt wird.
+
+---
+
+## Lizenz
+
+Copyright © 2024–2025 **Finn Lurz · LURZ ITsolution** — Alle Rechte vorbehalten.
+
+Diese Software wird ausschließlich zur **privaten, nicht-kommerziellen Nutzung** bereitgestellt.
+
+- ❌ Kommerzielle Nutzung, Verkauf oder entgeltliches Anbieten **nicht gestattet**
+- ❌ Weitergabe oder Vertrieb an Dritte **nicht gestattet**
+- ❌ Re-Branding oder Einbettung in kommerzielle Produkte **nicht gestattet**
+- ✅ Privater Einsatz in eigenen Organisationen (Vereine, Hilfsorganisationen, Feuerwehren) erlaubt
+- ✅ Anpassung des Quellcodes für den eigenen, internen Gebrauch erlaubt
+
+Bei Verstößen behält sich der Urheber ausdrücklich vor, **zivilrechtliche und strafrechtliche Schritte** einzuleiten.
+
+Die vollständigen Lizenzbedingungen sind in der Datei [`LICENSE`](LICENSE) einsehbar.
