@@ -403,7 +403,7 @@ Dry-Run-Modus, Debug-Endpunkte und strukturierte Logs sorgen dafür, dass jede �
 
 ## Lizenz
 
-Copyright © 2024–2025 **Finn Lurz · LURZ ITsolution** — Alle Rechte vorbehalten.
+Copyright © 2026 **Finn Lurz · LURZ ITsolution** — Alle Rechte vorbehalten.
 
 Diese Software wird ausschließlich zur **privaten, nicht-kommerziellen Nutzung** bereitgestellt.
 
