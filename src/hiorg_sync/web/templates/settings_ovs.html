@@ -7,7 +7,7 @@
 
   <div class="fwHint" style="margin-top: 6px;">
     Hier legst du fest, welche OVs in der UI auswählbar sind.
-    <br>Format: Komma-getrennt oder eine OV pro Zeile. Beispiel: <code>obuv,obum,obub</code>
+    <br>Format: Komma-getrennt oder eine OV pro Zeile. Beispiel: <code>ov1,ov2,ov3</code>
   </div>
 
   <form method="post" action="/ui/settings/ovs" style="margin-top: 16px;">
@@ -16,7 +16,7 @@
     <textarea class="fwInput"
               name="ov_list"
               style="height: 110px; padding-top: 10px; resize: vertical;"
-              placeholder="obuv,obum,obub,obuo,obuw,obus">{{ raw }}</textarea>
+              placeholder="ov1,ov2,ov3">{{ raw }}</textarea>
 
     {% if error %}
       <div class="fwHint" style="margin-top: 10px; color: #b00020;">

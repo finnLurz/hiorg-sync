@@ -3,40 +3,36 @@
 
 <div class="dashTop">
   <div>
-    <h1 class="fwTitle">HiOrg-Sync</h1>
-
-    {% if current_ov %}
-      <div class="fwHint">Aktive OV im Browser:
-        <span class="ovBadge">{{ current_ov }}</span>
-      </div>
-    {% else %}
-      <div class="fwHint">Keine OV gewählt (für Gruppenmapping nötig).</div>
-    {% endif %}
+    <h1 class="fwTitle">Dashboard</h1>
+    <div class="fwHint" style="margin-top: 4px;">
+      {% if current_ov %}
+        Aktive OV: <span class="ovBadge">{{ current_ov }}</span>
+      {% else %}
+        <span style="color: #f59e0b;">Keine OV ausgewählt — für Gruppenmapping erforderlich.</span>
+      {% endif %}
+    </div>
   </div>
 </div>
 
 <div class="dashGrid">
 
   <a class="dashCard" href="/ui/settings/ovs">
-    <div class="dashIcon">🏢️</div>
+    <div class="dashIcon">🏢</div>
     <div class="dashText">
-      <div class="dashTitle">HiOrg Ov´s hinterlegen</div>
-      <div class="dashSub">Alle OV´s welche abgerufen werden sollen, können hier hinterlegt werden</div>
+      <div class="dashTitle">OV-Liste</div>
+      <div class="dashSub">Verfügbare OVs konfigurieren</div>
     </div>
-    <div class="dashGo">→</div>
+    <div class="dashGo">›</div>
   </a>
 
-
-<a class="dashCard" href="/ui/settings/ldap-conn">
-  <div class="dashIcon">🔌</div>
-  <div class="dashText">
-    <div class="dashTitle">LDAP Verbindung</div>
-    <div class="dashSub">Server, Bind-User, Optionen</div>
-  </div>
-  <div class="dashGo">→</div>
-</a>
-
-
+  <a class="dashCard" href="/ui/settings/ldap-conn">
+    <div class="dashIcon">🔌</div>
+    <div class="dashText">
+      <div class="dashTitle">LDAP-Verbindung</div>
+      <div class="dashSub">Server, Bind-User, Verbindungsoptionen</div>
+    </div>
+    <div class="dashGo">›</div>
+  </a>
 
   <a class="dashCard" href="/ui/ov">
     <div class="dashIcon">🏷️</div>
@@ -44,39 +40,40 @@
       <div class="dashTitle">OV auswählen</div>
       <div class="dashSub">Aktive OV im Browser setzen</div>
     </div>
-    <div class="dashGo">→</div>
+    <div class="dashGo">›</div>
   </a>
 
   <a class="dashCard" href="/ui/settings/ou-map">
     <div class="dashIcon">🗂️</div>
     <div class="dashText">
-      <div class="dashTitle">LDAP OU-Mapping</div>
-      <div class="dashSub">OV → User-OU Zuordnung - Hier kann die Gruppenzuordnung von OV´s zu einzelnen AD-Ordnern festgelegt werden</div>
+      <div class="dashTitle">OU-Mapping</div>
+      <div class="dashSub">OV → Active Directory OU zuordnen</div>
     </div>
-    <div class="dashGo">→</div>
+    <div class="dashGo">›</div>
   </a>
 
   <a class="dashCard" href="/ui/settings/email">
     <div class="dashIcon">✉️</div>
     <div class="dashText">
-      <div class="dashTitle">E-Mail / Benachrichtigungen</div>
-      <div class="dashSub">SMTP + Absender konfigurieren</div>
+      <div class="dashTitle">E-Mail & Benachrichtigungen</div>
+      <div class="dashSub">SMTP-Server und Absender konfigurieren</div>
     </div>
-    <div class="dashGo">→</div>
+    <div class="dashGo">›</div>
   </a>
 
   <a class="dashCard" href="/ui/settings/ldap">
     <div class="dashIcon">🧩</div>
     <div class="dashText">
-      <div class="dashTitle">LDAP BaseDN Gruppenzuordnung</div>
-      <div class="dashSub">Standorte → BaseDN verwalten - Hier können Gruppenzugehörigkeiten mit der AD synchronisiert werden</div>
+      <div class="dashTitle">LDAP BaseDN / Gruppen</div>
+      <div class="dashSub">Standorte → BaseDN für Gruppensync</div>
     </div>
-    <div class="dashGo">→</div>
+    <div class="dashGo">›</div>
   </a>
+
 </div>
 
-<div class="fwHint dashFoot">
-  Tipp: OU-Mapping & SMTP sind global. Gruppenmapping ist pro OV.
+<div class="dashFoot fwHint">
+  OU-Mapping und SMTP sind global &nbsp;·&nbsp; Gruppenmapping ist pro OV
 </div>
 
 {% endblock %}
