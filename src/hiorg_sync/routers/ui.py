@@ -7,7 +7,10 @@ import secrets
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse
 
+from pathlib import Path
+
 from ..core.settings import get_ov_list, require_ov
+from ..core.storage import DATA_DIR
 from ..core.security import (
     UI_PASSWORD,
     UI_SESSION_TTL_HOURS,
@@ -87,9 +90,42 @@ def ui_dashboard(request: Request):
         return RedirectResponse("/ui/login?next=/ui/", status_code=302)
 
     current_ov = request.cookies.get("ui_ov", "") or ""
+    ovs = get_ov_list()
+
+    # Status per OV (token vorhanden? letzter Sync?)
+    ov_status: dict[str, dict] = {}
+    for ov in ovs:
+        ov_dir = DATA_DIR / ov
+        token_file = ov_dir / "tokens.json"
+        marker_file = ov_dir / "updated_since.txt"
+        has_token = token_file.exists()
+        last_sync: str | None = None
+        if marker_file.exists():
+            try:
+                content = marker_file.read_text(encoding="utf-8").strip()
+                if content:
+                    last_sync = content
+            except Exception:
+                pass
+        ov_status[ov] = {"has_token": has_token, "last_sync": last_sync}
+
+    # LDAP konfiguriert?
+    ldap_cfg = read_json(LDAP_PATH, default={})
+    ldap_configured = bool(
+        isinstance(ldap_cfg, dict)
+        and ldap_cfg.get("LDAP_URL")
+        and ldap_cfg.get("LDAP_BIND_USER")
+    )
+
     return _templates(request).TemplateResponse(
         "dashboard.html",
-        {"request": request, "current_ov": current_ov, "ovs": get_ov_list()},
+        {
+            "request": request,
+            "current_ov": current_ov,
+            "ovs": ovs,
+            "ov_status": ov_status,
+            "ldap_configured": ldap_configured,
+        },
     )
 
 
@@ -536,7 +572,7 @@ def ui_settings_ldap_conn_get(request: Request):
     view["LDAP_BIND_PASSWORD"] = ""
 
     # Defaults, falls noch nichts da ist (optional)
-    view.setdefault("LDAP_DEFAULT_DOMAIN", "fw-obu.de")
+    view.setdefault("LDAP_DEFAULT_DOMAIN", "")
     view.setdefault("LDAP_OVERWRITE_EMPTY", False)
     view.setdefault("LDAP_ONLY_STATUS_ACTIVE", True)
     view.setdefault("LDAP_GROUP_SYNC_REMOVE", False)
@@ -545,7 +581,7 @@ def ui_settings_ldap_conn_get(request: Request):
     view.setdefault("LDAP_SAM_MODE", "hiorg_username")
     view.setdefault("LDAP_SAM_USERNAME_KEY", "username")
     view.setdefault("LDAP_UPDATE_SAM", False)
-    view.setdefault("EXCLUDE_ORGAKUERZEL", "stab04")
+    view.setdefault("EXCLUDE_ORGAKUERZEL", "")
 
     return _templates(request).TemplateResponse(
         "settings_ldap_conn.html",
