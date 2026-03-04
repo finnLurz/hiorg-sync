@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
-  <link rel="stylesheet" href="/static/custom.css">
+  <link rel="stylesheet" href="/static/styles.css?v=3">
+  <link rel="stylesheet" href="/static/custom.css?v=3">
 </head>
 <body>
   <div class="fwWrap">
@@ -17,7 +17,7 @@
       {% if request.cookies.get("ui_session") %}
         <div class="fwCardTop">
           <div class="appBrand">
-            <span class="appLogo">⚡</span>
+            <span class="appLogo">&#9889;</span>
             <span class="appName">HiOrg-Sync</span>
           </div>
           <a class="fwBtn2 fwLogout" href="/ui/logout">Logout</a>
@@ -25,7 +25,14 @@
       {% endif %}
 
       {% block content %}{% endblock %}
+
     </div>
+
+    <footer class="appFooter">
+      <span>HiOrg-Sync &mdash; entwickelt von <strong>Finn Lurz &middot; LURZ ITsolution</strong></span>
+      <span class="appFooterSep">&middot;</span>
+      <span>Nutzung auf eigene Verantwortung &mdash; keine Haftung f&uuml;r Sch&auml;den oder Datenverlust.</span>
+    </footer>
   </div>
 </body>
 </html>

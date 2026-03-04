@@ -92,13 +92,14 @@ code {
   display: flex;
   flex-direction: column;
   align-items: center;
+  background: var(--hs-bg);
 }
 
 /* Top navigation bar */
 .fwCardTop {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 0 16px 0;
   border-bottom: 1px solid var(--hs-border);
   margin-bottom: 24px;
@@ -532,6 +533,27 @@ select.fwInput {
   font-size: 15px;
   letter-spacing: -0.2px;
   color: var(--hs-text);
+}
+
+/* ===== Footer ===== */
+.appFooter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 24px 20px;
+  font-size: 11px;
+  color: var(--hs-text-subtle);
+  text-align: center;
+  line-height: 1.6;
+}
+.appFooter strong {
+  color: var(--hs-text-muted);
+  font-weight: 600;
+}
+.appFooterSep {
+  opacity: 0.4;
 }
 
 /* ===== Responsive ===== */
