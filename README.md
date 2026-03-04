@@ -12,6 +12,7 @@
 - [Manuelle Installation](#manuelle-installation)
 - [Konfiguration](#konfiguration)
 - [Nutzung & UI](#nutzung--ui)
+- [Erster Sync & OAuth-Autorisierung](#erster-sync--oauth-autorisierung)
 - [API-Referenz](#api-referenz)
 - [Troubleshooting](#troubleshooting)
 - [Leitprinzipien](#leitprinzipien)
@@ -189,7 +190,7 @@ Alle Einstellungen werden über **Umgebungsvariablen** gesetzt (`.env`-Datei ode
 
 1. **LDAP-Verbindung** konfigurieren → `/ui/settings/ldap-conn`
 2. **OV-Liste** eintragen → `/ui/settings/ovs`
-3. **OAuth autorisieren** für jede OV → `/oauth/start?ov=<kürzel>`
+3. **OAuth autorisieren** für jede OV → `/oauth/start?ov=<kürzel>` (siehe [Erster Sync & OAuth-Autorisierung](#erster-sync--oauth-autorisierung))
 4. **OU-Mapping** festlegen → `/ui/settings/ou-map`
 5. **LDAP BaseDN** pro Standort eintragen → `/ui/settings/ldap`
 6. **Gruppenmapping** konfigurieren → Aktive OV wählen → Gruppen laden & zuordnen
@@ -214,6 +215,82 @@ curl -X POST http://<server>:8088/api/sync/ad/run \
 */15 * * * * curl -s -X POST http://localhost:8088/api/sync/ad/run \
   -H "X-API-Key: <key>" -d "ov=ov1"
 ```
+
+---
+
+## Erster Sync & OAuth-Autorisierung
+
+Bevor der erste Sync laufen kann, muss sich ein **HiOrg-Organisations-Admin** einmalig pro OV über den OAuth-Flow authentifizieren. Dabei wird ein Token ausgestellt und dauerhaft gespeichert — danach läuft alles automatisch.
+
+### Voraussetzungen
+
+- `HIORG_CLIENT_ID`, `HIORG_CLIENT_SECRET` und `HIORG_REDIRECT_URI` sind in der `.env` konfiguriert
+- Die `HIORG_REDIRECT_URI` (z.B. `https://hiorg-sync.example.com/oauth/callback`) muss **vom Browser des Admins erreichbar** sein — sie zeigt auf die laufende HiOrg-Sync-Instanz
+- Wird ein Reverse-Proxy verwendet (z.B. nginx, Traefik), muss der Pfad `/oauth/callback` korrekt weitergeleitet werden
+
+### Schritt 1 — OV-Liste konfigurieren
+
+Zuerst die OV(s) in der UI eintragen, falls noch nicht geschehen:
+
+```
+http://<server-ip>:8088/ui/settings/ovs
+```
+
+OV-Kürzel eintragen (z.B. `ov1`) und speichern. Ohne eingetragene OV schlägt der OAuth-Flow mit `403` fehl.
+
+### Schritt 2 — OAuth-Flow starten
+
+Ein **HiOrg-Organisations-Admin** öffnet folgende URL im Browser:
+
+```
+http://<server-ip>:8088/oauth/start?ov=<ov-kürzel>
+```
+
+> Wird ein Reverse-Proxy mit öffentlicher Domain verwendet:
+> ```
+> https://hiorg-sync.example.com/oauth/start?ov=<ov-kürzel>
+> ```
+
+Der Browser wird automatisch zur **HiOrg-Login-Seite** weitergeleitet.
+
+### Schritt 3 — Mit HiOrg-Admin-Account anmelden
+
+Der Admin meldet sich mit seinem HiOrg-Account an. HiOrg zeigt eine Zustimmungsseite mit den angeforderten Berechtigungen (`personal:read`, `personal:add`, `personal:update`).
+
+Nach der Bestätigung leitet HiOrg zurück zur `HIORG_REDIRECT_URI`. HiOrg-Sync empfängt den Autorisierungscode, tauscht ihn gegen einen Token und speichert ihn dauerhaft.
+
+**Erfolgreiche Autorisierung** — Antwort im Browser:
+
+```json
+{"ok": true, "ov": "ov1", "stored": true, "next": "/sync/run?ov=ov1"}
+```
+
+Das Token wird unter `DATA_DIR/<ov>/tokens.json` gespeichert und automatisch erneuert.
+
+### Schritt 4 — Ersten Sync starten
+
+Nach erfolgreicher Autorisierung kann der erste Sync angestoßen werden:
+
+**Über die UI:** Dashboard → OV auswählen → Gruppen-Mapping → `Sync` oder `Full Sync`
+
+**Oder direkt per API:**
+
+```bash
+curl -X POST http://<server>:8088/api/sync/ad/run \
+  -H "X-API-Key: <SYNC_API_KEY>" \
+  -d "ov=<ov-kürzel>&full=true"
+```
+
+> `full=true` empfiehlt sich beim allerersten Lauf, um alle Personen vollständig einzulesen.
+
+### Hinweis: Token-Erneuerung
+
+OAuth-Tokens werden automatisch per Refresh-Token erneuert. Ein erneuter manueller OAuth-Flow ist nur nötig wenn:
+- der Refresh-Token abgelaufen ist (nach längerer Inaktivität)
+- die HiOrg-App-Berechtigungen geändert wurden
+- die Datei `DATA_DIR/<ov>/tokens.json` gelöscht wurde
+
+In diesem Fall einfach Schritt 2–3 wiederholen.
 
 ---
 
@@ -262,12 +339,14 @@ Alle API-Endpunkte erfordern entweder:
 
 ## Troubleshooting
 
-### OAuth-Token abgelaufen
+### OAuth-Token fehlt oder abgelaufen
 
 ```
 401 Unauthorized beim HiOrg-API-Aufruf
 ```
 → Neuen OAuth-Flow starten: `/oauth/start?ov=<kürzel>`
+→ Im Dashboard: Status-Dot für OAuth zeigt rot → „Kein Token" bedeutet, der Flow wurde noch nicht durchgeführt oder das Token wurde gelöscht.
+→ Vollständige Anleitung: [Erster Sync & OAuth-Autorisierung](#erster-sync--oauth-autorisierung)
 
 ### LDAP-Verbindung schlägt fehl
 
