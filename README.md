@@ -7,6 +7,7 @@
 ## Inhaltsverzeichnis
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Architektur](#architektur)
 - [Schnellstart mit Docker](#schnellstart-mit-docker)
 - [Manuelle Installation](#manuelle-installation)
@@ -35,6 +36,14 @@
 | **E-Mail-Benachrichtigungen** | Kontaktänderungen per SMTP melden (pro OV konfigurierbar) |
 | **Web-UI** | Alle Einstellungen im Browser — kein Konfig-Datei-Chaos |
 | **Docker-ready** | Einzelner Container, persistentes Datenvolume |
+
+---
+
+## Screenshots
+
+| Login | Dashboard | OV-Auswahl |
+|---|---|---|
+| ![Login](docs/screenshots/screenshot-login.png) | ![Dashboard](docs/screenshots/screenshot-dashboard.png) | ![Dashboard OV](docs/screenshots/screenshot-dashboard-ov.png) |
 
 ---
 
