@@ -1,23 +1,25 @@
-# src/hiorg_sync/services/notify.py
 from __future__ import annotations
 
-import os
 import smtplib
 from email.message import EmailMessage
 
+from .email_settings import load_email_settings
+
 
 def send_mail(to_addr: str, subject: str, body: str) -> tuple[bool, str]:
-    host = os.getenv("SMTP_HOST", "").strip()
-    port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("SMTP_USER", "").strip()
-    pw = os.getenv("SMTP_PASS", "").strip()
+    cfg = load_email_settings()
 
-    starttls = os.getenv("SMTP_STARTTLS", "true").lower() in ("1", "true", "yes", "on")
-    use_ssl = os.getenv("SMTP_SSL", "false").lower() in ("1", "true", "yes", "on")
+    host = str(cfg.get("SMTP_HOST", "") or "").strip()
+    port = int(cfg.get("SMTP_PORT", 587) or 587)
+    user = str(cfg.get("SMTP_USER", "") or "").strip()
+    pw = str(cfg.get("SMTP_PASS", "") or "")
+
+    starttls = bool(cfg.get("SMTP_STARTTLS", True))
+    use_ssl = bool(cfg.get("SMTP_SSL", False))
 
     mail_from = (
-        os.getenv("NOTIFY_FROM", "").strip()
-        or os.getenv("SMTP_FROM", "").strip()
+        str(cfg.get("NOTIFY_FROM", "") or "").strip()
+        or str(cfg.get("SMTP_FROM", "") or "").strip()
         or user
         or "hiorg-sync@localhost"
     )

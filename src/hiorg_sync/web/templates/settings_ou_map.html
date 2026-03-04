@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1 class="fwTitle">LDAP OU-Mapping</h1>
+  <div class="fwHint" style="margin-top: 6px;">
+    OV ? Ziel-OU (User). Wird gespeichert unter <code>DATA_DIR/settings/ou_map.json</code>.
+  </div>
+
+  {% if saved %}
+    <div class="fwHint" style="margin-top: 10px;"><b>Gespeichert.</b></div>
+  {% endif %}
+  {% if error %}
+    <div class="fwHint" style="margin-top: 10px;"><b style="color: #b00020;">{{ error }}</b></div>
+  {% endif %}
+
+  <form method="post" action="/ui/settings/ou-map" style="margin-top: 14px;">
+    <div style="display: grid; grid-template-columns: 160px 1fr; gap: 10px; align-items: center;">
+      <div class="fwHint"><b>OV</b></div>
+      <div class="fwHint"><b>Target User OU</b></div>
+
+      {% for ov in ovs %}
+        <div class="fwHint">{{ ov }}</div>
+        <input class="fwInput" name="ou_{{ ov }}" value="{{ ou_map.get(ov|lower, '') }}" placeholder="OU=User,OU=...,DC=...,DC=...">
+      {% endfor %}
+    </div>
+
+    <div style="margin-top: 14px; display: flex; gap: 10px;">
+      <button class="fwBtn" type="submit">Speichern</button>
+      <a class="fwBtn" href="/ui/" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Zurück</a>
+    </div>
+  </form>
+{% endblock %}

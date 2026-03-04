@@ -9,11 +9,14 @@ import secrets
 from fastapi import Request, HTTPException
 
 
-UI_PASSWORD = os.getenv("UI_PASSWORD", "")  # wenn leer: UI ungeschützt
+UI_PASSWORD = os.getenv("UI_PASSWORD", "")  # wenn leer: UI ungeschÃ¼tzt
 UI_SESSION_SECRET = os.getenv("UI_SESSION_SECRET", os.getenv("STATE_SECRET", "change-me"))
 UI_SESSION_TTL_HOURS = int(os.getenv("UI_SESSION_TTL_HOURS", "12"))
 
-SYNC_API_KEY = os.getenv("SYNC_API_KEY", "")  # optional
+# API-Key (Sync-Endpunkte absichern)
+# Backward-Compat: akzeptiert SYNC_API_KEY oder API_KEY
+SYNC_API_KEY = (os.getenv("SYNC_API_KEY", "") or os.getenv("API_KEY", "")).strip()
+
 
 
 def _b64url_encode(b: bytes) -> str:

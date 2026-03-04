@@ -7,7 +7,9 @@
 </div>
 
 <div class="fwHint" style="margin-bottom: 14px;">
-  Ziel: HiOrg-Gruppen (nach Standort) einer <b>GroupBaseDN</b> zuordnen.
+  Ziel: HiOrg-Gruppen (optional nach Standort) einer AD-Gruppe (<b>CN</b>) zuordnen.
+  <br>
+  <b>BaseDN</b> wird zentral gepflegt unter <a href="/ui/settings/ldap">LDAP / BaseDN</a>.
   Gruppen werden <b>nicht</b> automatisch angelegt.
 </div>
 
@@ -20,56 +22,54 @@
 
 <h3 style="margin: 26px 0 10px;">Benachrichtigung (pro OV)</h3>
 
-<div class="fwRow fwHdr">
-  <div>Aktiv</div>
-  <div>Empfänger</div>
-  <div>Betreff</div>
-  <div>Frequenz</div>
-</div>
+<div class="notifyGrid">
+  <div class="fwRow fwHdr">
+    <div>Aktiv</div>
+    <div>Empfänger</div>
+    <div>Betreff</div>
+    <div>Frequenz</div>
+  </div>
 
-<div class="fwRow">
-  <label style="display:flex;align-items:center;gap:10px;">
-    <input type="checkbox" id="notify_enabled" oninput="setNotifyEnabled(this.checked)">
-    <span>Mailversand aktiv</span>
-  </label>
+  <div class="fwRow">
+    <label style="display:flex;align-items:center;gap:10px;">
+      <input type="checkbox" id="notify_enabled" oninput="setNotifyEnabled(this.checked)">
+      <span>Mailversand aktiv</span>
+    </label>
 
-  <input class="fwInput" id="notify_to"
-         placeholder="empfaenger@domain.tld"
-         oninput="setNotify('to', this.value)">
+    <input class="fwInput" id="notify_to"
+           placeholder="empfaenger@domain.tld"
+           oninput="setNotify('to', this.value)">
 
-  <input class="fwInput" id="notify_subject"
-         placeholder="[HiOrg-Sync] Änderungen {ov} ({count})"
-         oninput="setNotify('subject', this.value)">
+    <input class="fwInput" id="notify_subject"
+           placeholder="[HiOrg-Sync] Änderungen {ov} ({count})"
+           oninput="setNotify('subject', this.value)">
 
-  <select class="fwInput" id="notify_freq" onchange="setNotifyFreq(this.value)">
-    <option value="0">Sofort (bei jedem Sync)</option>
-    <option value="24">1× pro Tag</option>
-    <option value="12">2× pro Tag</option>
-    <option value="8">3× pro Tag</option>
-    <option value="6">4× pro Tag</option>
-  </select>
+    <select class="fwInput" id="notify_freq" onchange="setNotifyFreq(this.value)">
+      <option value="0">Sofort (bei jedem Sync)</option>
+      <option value="24">1× pro Tag</option>
+      <option value="12">2× pro Tag</option>
+      <option value="8">3× pro Tag</option>
+      <option value="6">4× pro Tag</option>
+    </select>
+  </div>
 </div>
 
 <div class="fwHint" style="margin-top:10px;">
   Platzhalter im Betreff: <code>{ov}</code> und <code>{count}</code>
 </div>
 
-<h3 style="margin: 18px 0 10px;">Standort → BaseDN</h3>
-<div id="locs"></div>
-<div style="margin-top: 10px;">
-  <button class="fwBtn2" type="button" onclick="addLoc()">+ Standort</button>
-</div>
-
 <h3 style="margin: 26px 0 10px;">Gruppen</h3>
-<div class="fwRow fwHdr">
-  <div>HiOrg Gruppe</div>
-  <div>Standort</div>
-  <div>BaseDN (aus Standort)</div>
-  <div>AD Gruppen-CN (Pflicht)</div>
+
+<div class="gmTable">
+  <div class="gmRow gmHdr">
+    <div>HiOrg Gruppe</div>
+    <div>Standort</div>
+    <div>AD Gruppen-CN (Pflicht)</div>
+  </div>
+
+
+<div id="groups" class="gmTable"></div>
 </div>
-<div id="groups"></div>
-
-
 
 <script>
   window.HIORG_OV = "{{ ov }}";

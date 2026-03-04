@@ -2,18 +2,17 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import secrets
 import unicodedata
 from datetime import datetime, timezone, timedelta
-
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request, HTTPException
 from ldap3 import MODIFY_ADD, MODIFY_DELETE, MODIFY_REPLACE, BASE
 from ldap3.utils.dn import escape_rdn
+
 from ..services.notify import send_mail
 from ..core.security import require_api_key
 from ..core.settings import (
@@ -46,7 +45,7 @@ from ..core.settings import (
 )
 from ..services.hiorg import refresh_tokens, fetch_personal_updated_since
 from ..services.ldap import ldap_conn, load_ou_map, ldap_search_one
-from ..services.groupmap_store import load_groupmap
+from ..services.groupmap_store import load_groupmap, resolve_group_base_dn
 
 router = APIRouter()
 
@@ -129,14 +128,6 @@ def _save_queue(ov: str, items: list[dict]) -> None:
     _notify_queue_path(ov).write_text(json.dumps(items, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def _env_bool(name: str, default: bool = False) -> bool:
-    v = str(os.getenv(name, "")).strip().lower()
-    if not v:
-        return default
-    return v in ("1", "true", "yes", "on")
-
-
-
 # -----------------------------
 # HiOrg helpers
 # -----------------------------
@@ -154,17 +145,6 @@ def _hiorg_groups(person: dict) -> list[str]:
     if isinstance(g, list):
         return [str(x) for x in g]
     return []
-
-
-def _person_location(attrs: dict) -> str:
-    return str(attrs.get(HIORG_LOCATION_KEY, "") or "").strip()
-
-
-def _split_group_location(group_name: str) -> tuple[str, str]:
-    parts = re.split(HIORG_GROUP_SPLIT_RE, group_name, maxsplit=1)
-    if len(parts) == 2:
-        return parts[0].strip(), parts[1].strip()
-    return "", group_name.strip()
 
 
 def _build_hiorg_id(person: dict) -> str:
@@ -253,6 +233,23 @@ def _ensure_unique_sam(conn, search_base: str, base_sam: str, fallback_username:
 # -----------------------------
 # AD mapping + updates
 # -----------------------------
+def _strip_empty_for_add(d: dict[str, Any]) -> dict[str, Any]:
+    """
+    AD ADD schlägt gern fehl, wenn Attribute als "" gesetzt werden.
+    Für MODIFY (Update) brauchen wir "" aber, damit wir mit LDAP_OVERWRITE_EMPTY löschen können.
+    -> Deshalb beim ADD leere Strings rausfiltern.
+    """
+    out: dict[str, Any] = {}
+    for k, v in (d or {}).items():
+        if k == "objectClass":
+            out[k] = v
+            continue
+        if isinstance(v, str) and v.strip() == "":
+            continue
+        out[k] = v
+    return out
+
+
 def _map_person_to_ad_attrs(person: dict, sam: str) -> dict[str, Any]:
     first = _hiorg_attr(person, "vorname")
     last = _hiorg_attr(person, "nachname")
@@ -285,23 +282,17 @@ def _map_person_to_ad_attrs(person: dict, sam: str) -> dict[str, Any]:
     if hid:
         attrs[LDAP_HIORG_ID_ATTR] = hid
 
-    if email:
-        attrs["mail"] = email
-    if teldienst:
-        attrs["telephoneNumber"] = teldienst
-    if telpriv:
-        attrs["homePhone"] = telpriv
-    if mobile:
-        attrs["mobile"] = mobile
+    # Managed fields: immer setzen (auch leer),
+    # damit LDAP_OVERWRITE_EMPTY beim UPDATE leeren/löschen kann.
+    attrs["mail"] = email
+    attrs["telephoneNumber"] = teldienst
+    attrs["homePhone"] = telpriv
+    attrs["mobile"] = mobile
 
-    if street:
-        attrs["streetAddress"] = street
-    if plz:
-        attrs["postalCode"] = plz
-    if city:
-        attrs["l"] = city
-    if land:
-        attrs["co"] = land
+    attrs["streetAddress"] = street
+    attrs["postalCode"] = plz
+    attrs["l"] = city
+    attrs["co"] = land
 
     return attrs
 
@@ -418,19 +409,15 @@ def _move_if_needed(conn, dn: str, target_ou: str) -> str:
 
 
 # -----------------------------
-# Group sync (optional, via groupmap.json)
+# Group sync (optional, via groupmap.json + global baseDN)
 # -----------------------------
 def _resolve_ad_group_dn(ov: str, hiorg_group_name: str) -> tuple[str | None, str]:
     m = load_groupmap(ov)
     gcfg = (m.get("groups") or {}).get(hiorg_group_name)
-    if not gcfg:
+    if not isinstance(gcfg, dict):
         return None, "no_mapping"
 
-    base_dn = str(gcfg.get("base_dn") or "").strip()
-    if not base_dn:
-        loc = str(gcfg.get("location") or "").strip()
-        base_dn = str(((m.get("locations") or {}).get(loc, {}) or {}).get("base_dn", "")).strip()
-
+    base_dn = resolve_group_base_dn(ov, hiorg_group_name)
     if not base_dn:
         return None, "no_base_dn"
 
@@ -443,56 +430,156 @@ def _resolve_ad_group_dn(ov: str, hiorg_group_name: str) -> tuple[str | None, st
     if cn.upper().startswith("CN="):
         cn = cn[3:].strip()
 
+    if not cn:
+        return None, "no_cn"
+
     return f"CN={escape_rdn(cn)},{base_dn}", "ok"
 
 
-def _group_exists(conn, group_dn: str) -> bool:
-    ok = conn.search(
-        search_base=group_dn,
-        search_filter="(objectClass=group)",
-        search_scope=BASE,
-        attributes=["distinguishedName"],
-        size_limit=1,
-    )
-    return bool(ok and conn.entries)
+def _split_hiorg_group(raw: str) -> str:
+    """
+    HiOrg liefert teils 'standort :: gruppenname'.
+    Für Mapping-Keys nutzen wir NUR den Gruppennamen (rechts).
+    """
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    try:
+        parts = re.split(HIORG_GROUP_SPLIT_RE, s, maxsplit=1)
+        if len(parts) == 2:
+            return parts[1].strip()
+    except Exception:
+        pass
+    return s
 
 
-def _sync_user_groups(conn, ov: str, user_dn: str, person: dict) -> dict:
-    desired = {str(x).strip() for x in _hiorg_groups(person) if str(x).strip()}
+def _person_groupnames(person: dict) -> set[str]:
+    out: set[str] = set()
+    for g in _hiorg_groups(person):
+        name = _split_hiorg_group(g)
+        if name:
+            out.add(name)
+    return out
 
-    m = load_groupmap(ov)
-    managed_groups = set((m.get("groups") or {}).keys())
 
-    add_ok, add_skipped, remove_ok = [], [], []
+def _group_has_member(conn, group_dn: str, user_dn: str) -> bool:
+    """
+    Prüft, ob user_dn in der Gruppe steht.
+    Liest die Gruppe selbst (Attribut LDAP_GROUP_MEMBER_ATTR), nicht memberOf.
+    """
+    try:
+        conn.search(
+            search_base=group_dn,
+            search_filter="(objectClass=*)",
+            search_scope=BASE,
+            attributes=[LDAP_GROUP_MEMBER_ATTR],
+        )
+        if not conn.entries:
+            return False
+        entry = conn.entries[0]
+        vals = getattr(entry, LDAP_GROUP_MEMBER_ATTR, None)
+        if not vals:
+            return False
+        members = [str(v) for v in vals.values]
+        udn = user_dn.lower()
+        return any(str(m).lower() == udn for m in members)
+    except Exception:
+        return False
 
-    # add desired
-    for g in sorted(desired):
-        group_dn, reason = _resolve_ad_group_dn(ov, g)
-        if not group_dn:
-            add_skipped.append({"group": g, "reason": reason})
+
+def _sync_user_groups(conn, ov: str, user_dn: str, person: dict) -> dict[str, Any]:
+    """
+    Sync AD Gruppenmitgliedschaften anhand:
+    - HiOrg person.attributes["gruppen_namen"]
+    - groupmap.json pro OV (hiorg_group_name -> {location, ad_cn})
+    - config.json (base_dn_by_location) via resolve_group_base_dn()
+
+    Ergebnis enthält added/removed/errors usw.
+    """
+    desired_names = _person_groupnames(person)
+
+    gm = load_groupmap(ov)
+    mapped = gm.get("groups") or {}
+    if not isinstance(mapped, dict):
+        mapped = {}
+
+    managed_dns: dict[str, str] = {}   # hiorg_name -> group_dn
+    desired_dns: dict[str, str] = {}   # hiorg_name -> group_dn
+
+    missing_cn: list[str] = []
+    missing_base_dn: list[str] = []
+    resolve_errors: list[str] = []
+
+    for hname, cfg in mapped.items():
+        if not isinstance(cfg, dict):
             continue
-        if not _group_exists(conn, group_dn):
-            add_skipped.append({"group": g, "reason": "ad_group_missing", "dn": group_dn})
+
+        # ad_cn ist bei euch Pflicht. Wenn leer: nicht managen, sonst fliegt es später "weg".
+        ad_cn = str(cfg.get("ad_cn") or "").strip()
+        if not ad_cn:
+            missing_cn.append(str(hname))
             continue
 
-        ok = conn.modify(group_dn, {LDAP_GROUP_MEMBER_ATTR: [(MODIFY_ADD, [user_dn])]})
-        code = (conn.result or {}).get("result")
-        if ok or code in (0, 20):
-            add_ok.append({"group": g, "dn": group_dn})
-        else:
-            add_skipped.append({"group": g, "reason": f"ldap_error_{code}", "dn": group_dn, "detail": conn.result})
+        group_dn, status = _resolve_ad_group_dn(ov, str(hname))
+        if not group_dn or status != "ok":
+            if status == "no_base_dn":
+                missing_base_dn.append(str(hname))
+            else:
+                resolve_errors.append(f"{hname}:{status}")
+            continue
 
-    # remove managed-but-not-desired (optional)
+        managed_dns[str(hname)] = group_dn
+        if str(hname) in desired_names:
+            desired_dns[str(hname)] = group_dn
+
+    to_add = []
+    for hname, gdn in desired_dns.items():
+        if not _group_has_member(conn, gdn, user_dn):
+            to_add.append(gdn)
+
+    to_remove = []
     if LDAP_GROUP_SYNC_REMOVE:
-        for g in sorted(managed_groups - desired):
-            group_dn, reason = _resolve_ad_group_dn(ov, g)
-            if not group_dn or not _group_exists(conn, group_dn):
+        desired_set = set(desired_dns.values())
+        for hname, gdn in managed_dns.items():
+            if gdn in desired_set:
                 continue
-            ok = conn.modify(group_dn, {LDAP_GROUP_MEMBER_ATTR: [(MODIFY_DELETE, [user_dn])]})
-            if ok:
-                remove_ok.append({"group": g, "dn": group_dn})
+            if _group_has_member(conn, gdn, user_dn):
+                to_remove.append(gdn)
 
-    return {"desired_count": len(desired), "added": add_ok, "skipped": add_skipped, "removed": remove_ok}
+    added: list[str] = []
+    removed: list[str] = []
+    errors: list[str] = []
+
+    for gdn in sorted(set(to_add)):
+        try:
+            ok = conn.modify(gdn, {LDAP_GROUP_MEMBER_ATTR: [(MODIFY_ADD, [user_dn])]} )
+            if ok:
+                added.append(gdn)
+            else:
+                errors.append(f"ADD failed {gdn}: {conn.result}")
+        except Exception as e:
+            errors.append(f"ADD exception {gdn}: {e}")
+
+    for gdn in sorted(set(to_remove)):
+        try:
+            ok = conn.modify(gdn, {LDAP_GROUP_MEMBER_ATTR: [(MODIFY_DELETE, [user_dn])]} )
+            if ok:
+                removed.append(gdn)
+            else:
+                errors.append(f"DEL failed {gdn}: {conn.result}")
+        except Exception as e:
+            errors.append(f"DEL exception {gdn}: {e}")
+
+    return {
+        "managed_count": len(managed_dns),
+        "desired_count": len(desired_dns),
+        "added": added,
+        "removed": removed,
+        "missing_cn_count": len(missing_cn),
+        "missing_base_dn_count": len(missing_base_dn),
+        "resolve_errors": resolve_errors[:50],
+        "errors": errors[:50],
+    }
 
 
 # -----------------------------
@@ -565,7 +652,10 @@ def debug_admap(request: Request, ov: str, limit: int = 3, dry_run: int = 1):
     ou_map = load_ou_map()
     target_ou = ou_map.get(ov.lower())
     if not target_ou:
-        raise HTTPException(500, f"No OU mapping for ov '{ov}'. Set LDAP_OU_MAP in .env")
+        raise HTTPException(
+            500,
+            f"No OU mapping for ov '{ov}'. Configure in UI (/ui/settings/ou-map) or set LDAP_OU_MAP_JSON env override.",
+        )
 
     people = people[: max(0, min(limit, 20))]
 
@@ -597,7 +687,10 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: i
     ou_map = load_ou_map()
     target_ou = ou_map.get(ov.lower())
     if not target_ou:
-        raise HTTPException(500, f"No OU mapping for ov '{ov}'. Set LDAP_OU_MAP in .env")
+        raise HTTPException(
+            500,
+            f"No OU mapping for ov '{ov}'. Configure in UI (/ui/settings/ou-map) or set LDAP_OU_MAP_JSON env override.",
+        )
 
     tokens = refresh_tokens(ov)
     access = tokens.get("access_token")
@@ -638,6 +731,10 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: i
         org = (attrs.get("orgakuerzel") or "").lower()
         status = attrs.get("status") or ""
 
+        # HARTER OV-FILTER (ganz wichtig)
+        if org.strip() != ov.lower().strip():
+            continue
+
         if org in excluded:
             continue
         if LDAP_ONLY_STATUS_ACTIVE and status != "aktiv":
@@ -674,7 +771,8 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: i
             continue
 
         if not existing:
-            ok = conn.add(dn_target, attributes=mapped)
+            # IMPORTANT: beim ADD keine leeren Strings mitsenden
+            ok = conn.add(dn_target, attributes=_strip_empty_for_add(mapped))
             group_sync = _sync_user_groups(conn, ov, dn_target, p) if ok else {}
             results.append({
                 "person_id": p.get("id"),
@@ -752,10 +850,6 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: i
 
     # -----------------------------
     # Notify: queue + rate-limit send (nur wenn nicht dry_run)
-    # - lädt immer Queue
-    # - hängt neue Einträge an (falls vorhanden)
-    # - sendet auch dann, wenn heute keine neuen Änderungen da sind,
-    #   aber Queue noch Einträge enthält und should_send=True
     # -----------------------------
     notify_sent = False
     notify_queued = 0
@@ -764,14 +858,12 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: i
     if (not dry_run) and notify_enabled and notify_to:
         q = _load_queue(ov)
 
-        # neue Benachrichtigungen anhängen (falls vorhanden)
         if notifications:
             ts = _iso(_now_utc())
             for n in notifications:
                 n["ts"] = ts
                 q.append(n)
 
-            # Queue begrenzen
             if len(q) > 2000:
                 q = q[-2000:]
 
@@ -779,7 +871,6 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: i
 
         notify_queued = len(q)
 
-        # Rate limit prüfen
         should_send = False
         if freq_hours <= 0:
             should_send = True
@@ -788,7 +879,6 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: i
             if (last is None) or ((_now_utc() - last).total_seconds() >= freq_hours * 3600):
                 should_send = True
 
-        # Senden, auch wenn nur alte Queue-Einträge da sind
         if should_send and q:
             subject = notify_subject_tpl or "[HiOrg-Sync] Änderungen OV={ov} ({count})"
             subject = subject.replace("{ov}", ov).replace("{count}", str(len(q)))
@@ -808,17 +898,14 @@ def sync_ad(request: Request, ov: str, limit: int = 0, dry_run: int = 0, full: i
                     lines.append(f"    {attr}: {diff.get('old')} -> {diff.get('new')}")
                 lines.append("")
 
-            try:
-                send_mail(notify_to, subject, "\n".join(lines))
+            ok, err = send_mail(notify_to, subject, "\n".join(lines))
+            if ok:
                 _save_queue(ov, [])
                 _write_last_sent(ov, _now_utc())
                 notify_sent = True
                 notify_queued = 0
-            except Exception as e:
-                notify_error = str(e)
-
-
-
+            else:
+                notify_error = err or "send failed"
 
     return {
         "ov": ov,

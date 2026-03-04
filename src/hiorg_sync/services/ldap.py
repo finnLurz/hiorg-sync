@@ -35,6 +35,8 @@ from ..core.settings import (
     LDAP_HIORG_ID_PREFIX,
 )
 
+from .config_store import read_json, OU_MAP_PATH
+
 
 # -----------------------------
 # Connection / config
@@ -61,14 +63,43 @@ def ldap_conn() -> Connection:
     return Connection(server, user=LDAP_BIND_USER, password=LDAP_BIND_PASSWORD, auto_bind=True)
 
 
-def load_ou_map() -> dict[str, str]:
-    try:
-        m = json.loads(LDAP_OU_MAP_JSON or "{}")
-        if not isinstance(m, dict):
-            return {}
-        return {str(k).lower(): str(v) for k, v in m.items()}
-    except Exception:
+def _normalize_ou_map(raw: Any) -> dict[str, str]:
+    """
+    Normalize mapping:
+      - keys -> lower/strip
+      - values -> strip
+      - keep only non-empty strings
+    """
+    if not isinstance(raw, dict):
         return {}
+    out: dict[str, str] = {}
+    for k, v in raw.items():
+        kk = str(k).strip().lower()
+        vv = str(v).strip()
+        if not kk or not vv:
+            continue
+        out[kk] = vv
+    return out
+
+
+def load_ou_map() -> dict[str, str]:
+    """
+    Priority:
+    1) ENV override (LDAP_OU_MAP_JSON / LDAP_OU_MAP) if non-empty and not "{}"
+    2) Persisted file OU_MAP_PATH (UI)
+    """
+    env_raw = str(LDAP_OU_MAP_JSON or "").strip()
+
+    # treat "{}" as empty
+    if env_raw and env_raw not in ("{}", "null", "None"):
+        try:
+            m = json.loads(env_raw)
+            return _normalize_ou_map(m)
+        except Exception:
+            return {}
+
+    m = read_json(OU_MAP_PATH, default={})
+    return _normalize_ou_map(m)
 
 
 # -----------------------------
@@ -263,7 +294,6 @@ def build_ad_attrs_from_person(person: dict, sam: str, ov: str) -> dict[str, Any
         "sAMAccountName": sam,
         "userPrincipalName": upn,
         "description": f"HiOrg {ov}",
-        # ohne Passwort besser disabled lassen, sonst brauchst du Passwort/Flags sauber
         "userAccountControl": 512 if LDAP_CREATE_ENABLED else 514,
     }
 
@@ -310,7 +340,6 @@ def apply_user_changes(conn: Connection, user_dn: str, desired: dict[str, Any]) 
     """
     changes: dict[str, Any] = {}
 
-    # standard string attrs we want to replace
     for k in [
         "givenName",
         "sn",
@@ -330,7 +359,6 @@ def apply_user_changes(conn: Connection, user_dn: str, desired: dict[str, Any]) 
         if k in desired:
             ldap_attr_set(changes, k, desired.get(k))
 
-    # optional rename sAMAccountName only if enabled
     if LDAP_UPDATE_SAM and "sAMAccountName" in desired:
         ldap_attr_set(changes, "sAMAccountName", desired.get("sAMAccountName"))
 
@@ -366,7 +394,6 @@ def group_dn_from_cn(base_dn: str, cn: str) -> str:
 def add_user_to_group(conn: Connection, group_dn: str, user_dn: str, member_attr: str = "member") -> dict:
     ok = conn.modify(group_dn, {member_attr: [(MODIFY_ADD, [user_dn])]})
     res = conn.result or {}
-    # 0=success, 20=attributeOrValueExists
     if ok or res.get("result") in (0, 20):
         return {"ok": True, "result": res}
     return {"ok": False, "result": res}

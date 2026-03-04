@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from .settings import get_ov_list, require_ov
 
-# Basisverzeichnis für Persistenz
+# Basisverzeichnis fÃ¼r Persistenz
 DATA_DIR = Path(__import__("os").environ.get("DATA_DIR", "/var/lib/hiorg-sync"))
 INITIAL_SYNC_DAYS = int(__import__("os").environ.get("INITIAL_SYNC_DAYS", "365"))
 
@@ -23,22 +23,7 @@ def ov_dir(ov: str) -> Path:
 
 
 # ---------- groupmap ----------
-def groupmap_path(ov: str) -> Path:
-    return ov_dir(ov) / "groupmap.json"
 
-
-def load_groupmap(ov: str) -> dict:
-    p = groupmap_path(ov)
-    if not p.exists():
-        return {"version": 1, "locations": {}, "groups": {}}
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
-        return {"version": 1, "locations": {}, "groups": {}}
-
-
-def save_groupmap(ov: str, m: dict) -> None:
-    groupmap_path(ov).write_text(json.dumps(m, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 # ---------- tokens ----------

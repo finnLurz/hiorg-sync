@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="topbar">
+    <h1 class="fwTitle">OV-Liste</h1>
+    <a class="fwBtn2 btn-back" href="/ui/">? Zurück</a>
+  </div>
+
+  <div class="fwHint" style="margin-top: 6px;">
+    Hier legst du fest, welche OVs in der UI auswählbar sind.
+    <br>Format: Komma-getrennt oder eine OV pro Zeile. Beispiel: <code>obuv,obum,obub</code>
+  </div>
+
+  <form method="post" action="/ui/settings/ovs" style="margin-top: 16px;">
+    <div class="fwHint" style="margin-bottom: 6px;">OVs</div>
+
+    <textarea class="fwInput"
+              name="ov_list"
+              style="height: 110px; padding-top: 10px; resize: vertical;"
+              placeholder="obuv,obum,obub,obuo,obuw,obus">{{ raw }}</textarea>
+
+    {% if error %}
+      <div class="fwHint" style="margin-top: 10px; color: #b00020;">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    {% if saved %}
+      <div class="fwHint" style="margin-top: 10px;">
+        ? Gespeichert.
+      </div>
+    {% endif %}
+
+    <div style="margin-top: 14px; display: flex; gap: 10px;">
+      <button class="fwBtn" type="submit">Speichern</button>
+      <a class="fwBtn2" href="/ui/">Abbrechen</a>
+    </div>
+
+    <div class="fwHint" style="margin-top: 10px;">
+      Datei: {{ cfg_path }}
+    </div>
+  </form>
+{% endblock %}
